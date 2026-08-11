@@ -1,6 +1,6 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║                 REYZIM HOLE MERGER - PRO                 ║
+    ║               REYZIM HOLE MERGER - V2 PRO                ║
     ║        TEMA: RED EDITION | SEM BIBLIOTECAS EXTERNAS      ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
@@ -10,6 +10,7 @@ local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 -- Remove versões antigas
@@ -19,9 +20,14 @@ if CoreGui:FindFirstChild("ReyzimHoleMergerUI") then CoreGui.ReyzimHoleMergerUI:
 local Config = {
     Enabled = false,
     Range = 50,
-    Speed = 50,
-    SafeZoneVisible = true
+    Speed = 60,
+    SafeZoneVisible = true,
+    AutoShield = true
 }
+
+-- [ REMOTES ]
+local ShieldRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")["sleitnick_knit@1.7.0"].knit.Services.ShieldService.RF.ActivateShield
+local HoleMoveRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")["sleitnick_knit@1.7.0"].knit.Services.HoleService.RF.RequestMove
 
 -- [ INTERFACE CUSTOMIZADA ]
 local ScreenGui = Instance.new("ScreenGui")
@@ -69,8 +75,8 @@ local Credits = Instance.new("TextLabel")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
-MainFrame.Position = UDim2.new(0.5, -110, 0.5, -100)
-MainFrame.Size = UDim2.new(0, 220, 0, 200)
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -125)
+MainFrame.Size = UDim2.new(0, 220, 0, 250)
 MainFrame.Visible = false
 
 MainCorner.CornerRadius = UDim.new(0, 15)
@@ -82,7 +88,7 @@ MainStroke.Parent = MainFrame
 
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "HOLE MERGER"
+Title.Text = "HOLE MERGER V2"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
@@ -97,28 +103,30 @@ Credits.Font = Enum.Font.Gotham
 Credits.TextSize = 10
 Credits.BackgroundTransparency = 1
 
--- Botão Toggle
-local ToggleBtn = Instance.new("TextButton")
-local ToggleCorner = Instance.new("UICorner")
+-- Botões e Inputs
+local function createButton(text, pos, parent)
+    local btn = Instance.new("TextButton")
+    local corner = Instance.new("UICorner")
+    btn.Size = UDim2.new(0.8, 0, 0, 35)
+    btn.Position = pos
+    btn.Parent = parent
+    btn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
+    return btn
+end
 
-ToggleBtn.Parent = MainFrame
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.25, 0)
-ToggleBtn.Size = UDim2.new(0.8, 0, 0, 35)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
-ToggleBtn.Text = "AUTO MERGE: OFF"
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.TextSize = 14
+local ToggleBtn = createButton("AUTO MERGE: OFF", UDim2.new(0.1, 0, 0.2, 0), MainFrame)
+local ShieldBtn = createButton("AUTO SHIELD: ON", UDim2.new(0.1, 0, 0.38, 0), MainFrame)
+ShieldBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 
-ToggleCorner.CornerRadius = UDim.new(0, 8)
-ToggleCorner.Parent = ToggleBtn
-
--- Slider de Range
 local RangeLabel = Instance.new("TextLabel")
-local RangeInput = Instance.new("TextBox")
-
 RangeLabel.Parent = MainFrame
-RangeLabel.Position = UDim2.new(0.1, 0, 0.5, 0)
+RangeLabel.Position = UDim2.new(0.1, 0, 0.58, 0)
 RangeLabel.Size = UDim2.new(0.5, 0, 0, 20)
 RangeLabel.Text = "RAIO DA ÁREA:"
 RangeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -127,8 +135,9 @@ RangeLabel.TextSize = 12
 RangeLabel.TextXAlignment = Enum.TextXAlignment.Left
 RangeLabel.BackgroundTransparency = 1
 
+local RangeInput = Instance.new("TextBox")
 RangeInput.Parent = MainFrame
-RangeInput.Position = UDim2.new(0.6, 0, 0.5, 0)
+RangeInput.Position = UDim2.new(0.6, 0, 0.58, 0)
 RangeInput.Size = UDim2.new(0.3, 0, 0, 20)
 RangeInput.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
 RangeInput.Text = tostring(Config.Range)
@@ -142,7 +151,7 @@ SafeZonePart.Name = "ReyzimSafeZone"
 SafeZonePart.Shape = Enum.PartType.Ball
 SafeZonePart.Material = Enum.Material.ForceField
 SafeZonePart.Color = Color3.fromRGB(255, 0, 0)
-SafeZonePart.Transparency = 0.8
+SafeZonePart.Transparency = 1
 SafeZonePart.CanCollide = false
 SafeZonePart.Anchored = true
 SafeZonePart.Parent = workspace
@@ -165,39 +174,41 @@ local function moveTo(targetCFrame)
     tween.Completed:Wait()
 end
 
+-- Função Anti-Bug: Solta o Hole enviando ele para uma posição segura
+local function releaseHole(holeId, pos)
+    pcall(function()
+        HoleMoveRemote:InvokeServer(holeId, pos + Vector3.new(0, 2, 0))
+    end)
+end
+
 local function findHoles()
     local holesFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Holes")
     if not holesFolder then return {} end
     
     local found = {}
-    local root = getRoot()
-    if not root then return {} end
-    
     for _, hole in pairs(holesFolder:GetChildren()) do
-        if hole:IsA("Model") or hole:IsA("BasePart") then
-            local pos = hole:GetPivot().Position
-            local dist = (pos - SafeZonePart.Position).Magnitude
-            
-            if dist <= Config.Range then
-                local tier = hole:GetAttribute("Tier")
-                if tier then
-                    if not found[tier] then found[tier] = {} end
-                    table.insert(found[tier], hole)
-                end
+        local pos = hole:GetPivot().Position
+        local dist = (pos - SafeZonePart.Position).Magnitude
+        
+        if dist <= Config.Range then
+            local tier = hole:GetAttribute("Tier")
+            local id = hole:GetAttribute("HoleId")
+            if tier and id then
+                if not found[tier] then found[tier] = {} end
+                table.insert(found[tier], {obj = hole, id = id, pos = pos})
             end
         end
     end
     return found
 end
 
--- Toggle Logic
+-- Toggles
 ToggleBtn.MouseButton1Click:Connect(function()
     Config.Enabled = not Config.Enabled
     ToggleBtn.Text = Config.Enabled and "AUTO MERGE: ON" or "AUTO MERGE: OFF"
     ToggleBtn.BackgroundColor3 = Config.Enabled and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(50, 0, 0)
     
     if Config.Enabled then
-        -- Fixa a Safe Zone onde o player ligou o script
         local root = getRoot()
         if root then
             SafeZonePart.Position = root.Position
@@ -207,6 +218,12 @@ ToggleBtn.MouseButton1Click:Connect(function()
     else
         SafeZonePart.Transparency = 1
     end
+end)
+
+ShieldBtn.MouseButton1Click:Connect(function()
+    Config.AutoShield = not Config.AutoShield
+    ShieldBtn.Text = Config.AutoShield and "AUTO SHIELD: ON" or "AUTO SHIELD: OFF"
+    ShieldBtn.BackgroundColor3 = Config.AutoShield and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(50, 0, 0)
 end)
 
 RangeInput.FocusLost:Connect(function()
@@ -223,7 +240,17 @@ FloatingLogo.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
 end)
 
--- Main Loop
+-- Loop do Escudo (10 segundos)
+task.spawn(function()
+    while true do
+        if Config.AutoShield then
+            pcall(function() ShieldRemote:InvokeServer() end)
+        end
+        task.wait(10)
+    end
+end)
+
+-- Main Loop de Merge
 task.spawn(function()
     while true do
         if Config.Enabled then
@@ -236,27 +263,30 @@ task.spawn(function()
                     local h1 = list[1]
                     local h2 = list[2]
                     
-                    -- Move para o primeiro Hole
-                    moveTo(h1:GetPivot())
-                    task.wait(0.5) -- Espera "grudar"
+                    -- Sistema Anti-Bug: Garante que não estamos "travados" com outro hole
+                    -- Tenta mover para o primeiro
+                    moveTo(h1.obj:GetPivot())
+                    task.wait(0.7)
                     
-                    -- Move para o segundo Hole para fundir
-                    moveTo(h2:GetPivot())
-                    task.wait(0.5) -- Espera fusão
+                    -- Se após chegar no primeiro ele não fundir ou algo bugar, tentamos o segundo
+                    moveTo(h2.obj:GetPivot())
+                    task.wait(0.7)
                     
-                    break -- Processa um par por vez
+                    -- Se ainda estivermos com o Hole (verificando se o objeto ainda existe)
+                    -- Poderíamos usar o releaseHole aqui se necessário
+                    break 
                 end
             end
             
             if not foundPair then
-                task.wait(1) -- Espera novos Holes nascerem
+                task.wait(1)
             end
         end
         task.wait(0.1)
     end
 end)
 
--- FPS e Update Esfera
+-- FPS
 local lastIteration, frameCount = tick(), 0
 RunService.RenderStepped:Connect(function()
     frameCount = frameCount + 1
@@ -265,10 +295,6 @@ RunService.RenderStepped:Connect(function()
         frameCount = 0
         lastIteration = tick()
     end
-    
-    if not Config.Enabled then
-        SafeZonePart.Transparency = 1
-    end
 end)
 
-print("Reyzim Hole Merger Loaded!")
+print("Reyzim Hole Merger V2 Loaded!")
