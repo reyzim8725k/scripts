@@ -1,13 +1,14 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║             REYZIM HOLE MERGER - TELEKINESIS             ║
-    ║        TEMA: RED EDITION | REMOTE MOVE SYSTEM            ║
+    ║               REYZIM HOLE MERGER - HYBRID                ║
+    ║        TEMA: RED EDITION | HYBRID MERGE SYSTEM           ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
 ]]
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
@@ -19,7 +20,9 @@ if CoreGui:FindFirstChild("ReyzimHoleMergerUI") then CoreGui.ReyzimHoleMergerUI:
 local Config = {
     Enabled = false,
     Range = 50,
+    SafeZoneVisible = true,
     AutoShield = true,
+    FlyHeight = 20
 }
 
 -- [ REMOTES ]
@@ -85,7 +88,7 @@ MainStroke.Parent = MainFrame
 
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "HOLE TELEKINESIS"
+Title.Text = "HYBRID MERGER"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
@@ -117,7 +120,7 @@ local function createButton(text, pos, parent)
     return btn
 end
 
-local ToggleBtn = createButton("TELEKINESIS: OFF", UDim2.new(0.1, 0, 0.2, 0), MainFrame)
+local ToggleBtn = createButton("HYBRID MERGE: OFF", UDim2.new(0.1, 0, 0.2, 0), MainFrame)
 local ShieldBtn = createButton("AUTO SHIELD: ON", UDim2.new(0.1, 0, 0.38, 0), MainFrame)
 ShieldBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 
@@ -159,6 +162,13 @@ local function getRoot()
     return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 end
 
+local function teleportTo(targetCFrame)
+    local root = getRoot()
+    if root then
+        root.CFrame = targetCFrame
+    end
+end
+
 local function findHoles()
     local holesFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Holes")
     if not holesFolder then return {} end
@@ -183,7 +193,7 @@ end
 -- Toggles
 ToggleBtn.MouseButton1Click:Connect(function()
     Config.Enabled = not Config.Enabled
-    ToggleBtn.Text = Config.Enabled and "TELEKINESIS: ON" or "TELEKINESIS: OFF"
+    ToggleBtn.Text = Config.Enabled and "HYBRID MERGE: ON" or "HYBRID MERGE: OFF"
     ToggleBtn.BackgroundColor3 = Config.Enabled and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(50, 0, 0)
     
     if Config.Enabled then
@@ -228,27 +238,52 @@ task.spawn(function()
     end
 end)
 
--- Main Loop (Telekinesis: Move Holes to each other)
+-- Main Loop (Hybrid: Telekinesis to Player + Instant Teleport to Target)
 task.spawn(function()
+    local originalPos = nil
     while true do
         if Config.Enabled then
-            local allHoles = findHoles()
-            
-            for tier, list in pairs(allHoles) do
-                if #list >= 2 then
-                    local h1 = list[1]
-                    local h2 = list[2]
-                    
-                    -- Move o primeiro Hole para a posição do segundo Hole
-                    pcall(function()
-                        HoleMoveRemote:InvokeServer(h1.id, h2.pos)
-                    end)
-                    
-                    task.wait(0.3) -- Pequeno delay para processar a fusão
+            local root = getRoot()
+            if root then
+                local allHoles = findHoles()
+                local foundPair = false
+                
+                for tier, list in pairs(allHoles) do
+                    if #list >= 2 then
+                        foundPair = true
+                        local h1 = list[1]
+                        local h2 = list[2]
+                        
+                        -- 1. Puxa o primeiro Hole para o Jogador
+                        pcall(function()
+                            HoleMoveRemote:InvokeServer(h1.id, root.Position)
+                        end)
+                        task.wait(0.2)
+                        
+                        -- 2. Teleporta o Jogador para o primeiro Hole (para garantir que o servidor registre o "pegar")
+                        teleportTo(h1.obj:GetPivot())
+                        task.wait(0.2)
+                        
+                        -- 3. Teleporta o Jogador (com o Hole 1) para a posição do Hole 2
+                        teleportTo(h2.obj:GetPivot())
+                        task.wait(0.3)
+                        
+                        -- 4. Volta para a posição de voo acima da SafeZone
+                        teleportTo(CFrame.new(SafeZonePart.Position + Vector3.new(0, Config.FlyHeight, 0)))
+                        break 
+                    end
+                end
+                
+                -- Se não houver par, mantém o voo
+                if not foundPair then
+                    local flyPos = SafeZonePart.Position + Vector3.new(0, Config.FlyHeight, 0)
+                    if (root.Position - flyPos).Magnitude > 5 then
+                        teleportTo(CFrame.new(flyPos))
+                    end
                 end
             end
         end
-        task.wait(0.2)
+        task.wait(0.1)
     end
 end)
 
@@ -263,4 +298,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("Reyzim Hole Merger Telekinesis Loaded!")
+print("Reyzim Hole Merger Hybrid Loaded!")
