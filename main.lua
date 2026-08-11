@@ -1,7 +1,7 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║               REYZIM HOLE MERGER - V2 PRO                ║
-    ║        TEMA: RED EDITION | SEM BIBLIOTECAS EXTERNAS      ║
+    ║              REYZIM HOLE MERGER - GOD MODE               ║
+    ║        TEMA: RED EDITION | TELEPORT & FLY SYSTEM         ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
 ]]
@@ -20,14 +20,13 @@ if CoreGui:FindFirstChild("ReyzimHoleMergerUI") then CoreGui.ReyzimHoleMergerUI:
 local Config = {
     Enabled = false,
     Range = 50,
-    Speed = 60,
     SafeZoneVisible = true,
-    AutoShield = true
+    AutoShield = true,
+    FlyHeight = 25 -- Altura do voo acima da safezone
 }
 
 -- [ REMOTES ]
 local ShieldRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")["sleitnick_knit@1.7.0"].knit.Services.ShieldService.RF.ActivateShield
-local HoleMoveRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")["sleitnick_knit@1.7.0"].knit.Services.HoleService.RF.RequestMove
 
 -- [ INTERFACE CUSTOMIZADA ]
 local ScreenGui = Instance.new("ScreenGui")
@@ -88,7 +87,7 @@ MainStroke.Parent = MainFrame
 
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "HOLE MERGER V2"
+Title.Text = "HOLE GOD MODE"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
@@ -120,7 +119,7 @@ local function createButton(text, pos, parent)
     return btn
 end
 
-local ToggleBtn = createButton("AUTO MERGE: OFF", UDim2.new(0.1, 0, 0.2, 0), MainFrame)
+local ToggleBtn = createButton("GOD MERGE: OFF", UDim2.new(0.1, 0, 0.2, 0), MainFrame)
 local ShieldBtn = createButton("AUTO SHIELD: ON", UDim2.new(0.1, 0, 0.38, 0), MainFrame)
 ShieldBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 
@@ -162,23 +161,11 @@ local function getRoot()
     return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 end
 
-local function moveTo(targetCFrame)
+local function teleportTo(targetCFrame)
     local root = getRoot()
-    if not root then return end
-    
-    local distance = (root.Position - targetCFrame.Position).Magnitude
-    local duration = distance / Config.Speed
-    
-    local tween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
-    tween:Play()
-    tween.Completed:Wait()
-end
-
--- Função Anti-Bug: Solta o Hole enviando ele para uma posição segura
-local function releaseHole(holeId, pos)
-    pcall(function()
-        HoleMoveRemote:InvokeServer(holeId, pos + Vector3.new(0, 2, 0))
-    end)
+    if root then
+        root.CFrame = targetCFrame
+    end
 end
 
 local function findHoles()
@@ -192,10 +179,9 @@ local function findHoles()
         
         if dist <= Config.Range then
             local tier = hole:GetAttribute("Tier")
-            local id = hole:GetAttribute("HoleId")
-            if tier and id then
+            if tier then
                 if not found[tier] then found[tier] = {} end
-                table.insert(found[tier], {obj = hole, id = id, pos = pos})
+                table.insert(found[tier], hole)
             end
         end
     end
@@ -205,7 +191,7 @@ end
 -- Toggles
 ToggleBtn.MouseButton1Click:Connect(function()
     Config.Enabled = not Config.Enabled
-    ToggleBtn.Text = Config.Enabled and "AUTO MERGE: ON" or "AUTO MERGE: OFF"
+    ToggleBtn.Text = Config.Enabled and "GOD MERGE: ON" or "GOD MERGE: OFF"
     ToggleBtn.BackgroundColor3 = Config.Enabled and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(50, 0, 0)
     
     if Config.Enabled then
@@ -250,36 +236,42 @@ task.spawn(function()
     end
 end)
 
--- Main Loop de Merge
+-- Main Loop (God Mode: Fly & Instant Teleport)
 task.spawn(function()
     while true do
         if Config.Enabled then
-            local allHoles = findHoles()
-            local foundPair = false
-            
-            for tier, list in pairs(allHoles) do
-                if #list >= 2 then
-                    foundPair = true
-                    local h1 = list[1]
-                    local h2 = list[2]
-                    
-                    -- Sistema Anti-Bug: Garante que não estamos "travados" com outro hole
-                    -- Tenta mover para o primeiro
-                    moveTo(h1.obj:GetPivot())
-                    task.wait(0.7)
-                    
-                    -- Se após chegar no primeiro ele não fundir ou algo bugar, tentamos o segundo
-                    moveTo(h2.obj:GetPivot())
-                    task.wait(0.7)
-                    
-                    -- Se ainda estivermos com o Hole (verificando se o objeto ainda existe)
-                    -- Poderíamos usar o releaseHole aqui se necessário
-                    break 
+            local root = getRoot()
+            if root then
+                local allHoles = findHoles()
+                local foundPair = false
+                
+                for tier, list in pairs(allHoles) do
+                    if #list >= 2 then
+                        foundPair = true
+                        local h1 = list[1]
+                        local h2 = list[2]
+                        
+                        -- Teleporte Instantâneo para o primeiro
+                        teleportTo(h1:GetPivot())
+                        task.wait(0.2)
+                        
+                        -- Teleporte Instantâneo para o segundo (Merge)
+                        teleportTo(h2:GetPivot())
+                        task.wait(0.3)
+                        
+                        -- Volta para a posição de voo acima da SafeZone
+                        teleportTo(CFrame.new(SafeZonePart.Position + Vector3.new(0, Config.FlyHeight, 0)))
+                        break 
+                    end
                 end
-            end
-            
-            if not foundPair then
-                task.wait(1)
+                
+                -- Se não houver par, mantém o voo
+                if not foundPair then
+                    local flyPos = SafeZonePart.Position + Vector3.new(0, Config.FlyHeight, 0)
+                    if (root.Position - flyPos).Magnitude > 5 then
+                        teleportTo(CFrame.new(flyPos))
+                    end
+                end
             end
         end
         task.wait(0.1)
@@ -297,4 +289,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("Reyzim Hole Merger V2 Loaded!")
+print("Reyzim Hole Merger God Mode Loaded!")
