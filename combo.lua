@@ -1,10 +1,14 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║               REYZIM COMBO MASTER - V1.1                 ║
+    ║               REYZIM COMBO MASTER - V1.2                 ║
     ║        TEMA: RED EDITION | MOBILE COMBO SYSTEM           ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
 ]]
+
+print("-----------------------------------------")
+print("Reyzim Combo Master V1.2 Carregando...")
+print("-----------------------------------------")
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -21,7 +25,7 @@ local ComboData = {
 }
 local SaveFile = "ReyzimComboSave.json"
 
--- Mapeamento de teclas para Enum.KeyCode
+-- Mapeamento SEGURO de teclas para Enum.KeyCode
 local KeyMapping = {
     ["1"] = Enum.KeyCode.One,
     ["2"] = Enum.KeyCode.Two,
@@ -29,38 +33,44 @@ local KeyMapping = {
     ["4"] = Enum.KeyCode.Four,
     ["5"] = Enum.KeyCode.Five,
     ["6"] = Enum.KeyCode.Six,
+    ["Z"] = Enum.KeyCode.Z,
     ["X"] = Enum.KeyCode.X,
     ["V"] = Enum.KeyCode.V,
     ["F"] = Enum.KeyCode.F,
-    ["C"] = Enum.KeyCode.C,
-    ["A"] = Enum.KeyCode.A,
-    ["Z"] = Enum.KeyCode.Z
+    ["C"] = Enum.KeyCode.C
 }
 
 -- [ FUNÇÕES DE SISTEMA ]
 local function saveCombo()
-    local data = HttpService:JSONEncode(ComboData.Sequence)
-    writefile(SaveFile, data)
+    local success, err = pcall(function()
+        local data = HttpService:JSONEncode(ComboData.Sequence)
+        writefile(SaveFile, data)
+    end)
+    if not success then warn("Erro ao salvar: " .. tostring(err)) end
 end
 
 local function loadCombo()
-    if isfile(SaveFile) then
-        local data = readfile(SaveFile)
-        ComboData.Sequence = HttpService:JSONDecode(data)
-    end
+    pcall(function()
+        if isfile(SaveFile) then
+            local data = readfile(SaveFile)
+            ComboData.Sequence = HttpService:JSONDecode(data)
+        end
+    end)
 end
 
 local function executeCombo()
     for _, item in ipairs(ComboData.Sequence) do
-        local keyStr = item.key
+        local keyStr = tostring(item.key)
         local keyCode = KeyMapping[keyStr]
         local delayTime = tonumber(item.delay) or 0
         
         if keyCode then
-            -- Simula o pressionamento da tecla
-            VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
-            task.wait(0.05)
-            VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+            -- Simula o pressionamento da tecla de forma segura
+            pcall(function()
+                VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+                task.wait(0.05)
+                VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+            end)
         end
         
         if delayTime > 0 then
@@ -73,6 +83,7 @@ end
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "ReyzimComboUI"
 ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
 
 -- Botão Flutuante Principal (Logo)
 local FloatingLogo = Instance.new("ImageButton")
@@ -142,7 +153,7 @@ MainStroke.Parent = MainFrame
 
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "COMBO MASTER V1.1"
+Title.Text = "COMBO MASTER V1.2"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
@@ -165,7 +176,7 @@ KeyContainer.Position = UDim2.new(0, 10, 0, 45)
 KeyContainer.Size = UDim2.new(1, -20, 0, 80)
 KeyContainer.BackgroundTransparency = 1
 
-local keys = {"1", "2", "3", "4", "5", "6", "Z", "X", "V", "F", "C", "A"}
+local keys = {"1", "2", "3", "4", "5", "6", "Z", "X", "V", "F", "C"}
 local UIListLayoutKeys = Instance.new("UIGridLayout")
 UIListLayoutKeys.Parent = KeyContainer
 UIListLayoutKeys.CellSize = UDim2.new(0, 35, 0, 35)
@@ -295,7 +306,6 @@ end
 
 SaveBtn.MouseButton1Click:Connect(function()
     saveCombo()
-    print("Combo Salvo!")
 end)
 
 ClearBtn.MouseButton1Click:Connect(function()
@@ -315,4 +325,4 @@ end)
 loadCombo()
 updateSeqUI()
 
-print("Reyzim Combo Master V1.1 Loaded!")
+print("Reyzim Combo Master V1.2 Carregado com Sucesso!")
