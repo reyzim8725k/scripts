@@ -1,7 +1,7 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║               REYZIM HOLE MERGER - HYBRID                ║
-    ║        TEMA: RED EDITION | HYBRID MERGE SYSTEM           ║
+    ║               REYZIM HOLE MERGER - V3 ULTIMATE           ║
+    ║        TEMA: RED EDITION | MULTIHUB SYSTEM               ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
 ]]
@@ -22,7 +22,10 @@ local Config = {
     Range = 50,
     SafeZoneVisible = true,
     AutoShield = true,
-    FlyHeight = 20
+    FlyHeight = 20,
+    ESPEnabled = false,
+    ManualFly = false,
+    FlySpeed = 50
 }
 
 -- [ REMOTES ]
@@ -71,13 +74,15 @@ local MainCorner = Instance.new("UICorner")
 local MainStroke = Instance.new("UIStroke")
 local Title = Instance.new("TextLabel")
 local Credits = Instance.new("TextLabel")
+local TabContainer = Instance.new("ScrollingFrame")
 
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
-MainFrame.Position = UDim2.new(0.5, -110, 0.5, -125)
-MainFrame.Size = UDim2.new(0, 220, 0, 250)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -150)
+MainFrame.Size = UDim2.new(0, 250, 0, 320)
 MainFrame.Visible = false
+MainFrame.ClipsDescendants = true
 
 MainCorner.CornerRadius = UDim.new(0, 15)
 MainCorner.Parent = MainFrame
@@ -88,11 +93,19 @@ MainStroke.Parent = MainFrame
 
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "HYBRID MERGER"
+Title.Text = "REYZIM MULTIHUB V3"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 18
+Title.TextSize = 16
 Title.BackgroundTransparency = 1
+
+TabContainer.Parent = MainFrame
+TabContainer.Position = UDim2.new(0, 10, 0, 40)
+TabContainer.Size = UDim2.new(1, -20, 1, -70)
+TabContainer.BackgroundTransparency = 1
+TabContainer.CanvasSize = UDim2.new(0, 0, 1.5, 0)
+TabContainer.ScrollBarThickness = 2
+TabContainer.ScrollBarImageColor3 = Color3.fromRGB(255, 0, 0)
 
 Credits.Parent = MainFrame
 Credits.Position = UDim2.new(0, 0, 1, -25)
@@ -103,51 +116,114 @@ Credits.Font = Enum.Font.Gotham
 Credits.TextSize = 10
 Credits.BackgroundTransparency = 1
 
--- Botões e Inputs
-local function createButton(text, pos, parent)
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = TabContainer
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 8)
+
+-- Helper Functions para UI
+local function createToggle(text, callback)
     local btn = Instance.new("TextButton")
     local corner = Instance.new("UICorner")
-    btn.Size = UDim2.new(0.8, 0, 0, 35)
-    btn.Position = pos
-    btn.Parent = parent
-    btn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
-    btn.Text = text
+    btn.Size = UDim2.new(1, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+    btn.Text = text .. ": OFF"
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 13
+    btn.TextSize = 12
+    btn.Parent = TabContainer
     corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = btn
+    
+    local enabled = false
+    btn.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        btn.Text = text .. (enabled and ": ON" or ": OFF")
+        btn.BackgroundColor3 = enabled and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(40, 0, 0)
+        callback(enabled)
+    end)
     return btn
 end
 
-local ToggleBtn = createButton("HYBRID MERGE: OFF", UDim2.new(0.1, 0, 0.2, 0), MainFrame)
-local ShieldBtn = createButton("AUTO SHIELD: ON", UDim2.new(0.1, 0, 0.38, 0), MainFrame)
-ShieldBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+local function createTextBox(placeholder, callback)
+    local box = Instance.new("TextBox")
+    local corner = Instance.new("UICorner")
+    box.Size = UDim2.new(1, 0, 0, 35)
+    box.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+    box.PlaceholderText = placeholder
+    box.Text = ""
+    box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    box.PlaceholderColor3 = Color3.fromRGB(150, 0, 0)
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 12
+    box.Parent = TabContainer
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = box
+    box.FocusLost:Connect(function(enter)
+        if enter then callback(box.Text) end
+    end)
+    return box
+end
 
-local RangeLabel = Instance.new("TextLabel")
-RangeLabel.Parent = MainFrame
-RangeLabel.Position = UDim2.new(0.1, 0, 0.58, 0)
-RangeLabel.Size = UDim2.new(0.5, 0, 0, 20)
-RangeLabel.Text = "RAIO DA ÁREA:"
-RangeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-RangeLabel.Font = Enum.Font.Gotham
-RangeLabel.TextSize = 12
-RangeLabel.TextXAlignment = Enum.TextXAlignment.Left
-RangeLabel.BackgroundTransparency = 1
+local function createButton(text, callback)
+    local btn = Instance.new("TextButton")
+    local corner = Instance.new("UICorner")
+    btn.Size = UDim2.new(1, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 12
+    btn.Parent = TabContainer
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
 
-local RangeInput = Instance.new("TextBox")
-RangeInput.Parent = MainFrame
-RangeInput.Position = UDim2.new(0.6, 0, 0.58, 0)
-RangeInput.Size = UDim2.new(0.3, 0, 0, 20)
-RangeInput.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
-RangeInput.Text = tostring(Config.Range)
-RangeInput.TextColor3 = Color3.fromRGB(255, 0, 0)
-RangeInput.Font = Enum.Font.GothamBold
-RangeInput.TextSize = 12
+-- [ LÓGICA DE FUNCIONAMENTO ]
 
--- Esfera Visual (Safe Zone)
+-- ESP SYSTEM
+local function createESP(player)
+    if player == LocalPlayer then return end
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ReyzimESP"
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 0.5
+    highlight.Enabled = Config.ESPEnabled
+    
+    local function apply()
+        if player.Character then
+            highlight.Parent = player.Character
+        end
+    end
+    apply()
+    player.CharacterAdded:Connect(apply)
+end
+
+for _, p in pairs(Players:GetPlayers()) do createESP(p) end
+Players.PlayerAdded:Connect(createESP)
+
+-- FLY SYSTEM
+local flyPart = nil
+local function toggleFly(enabled)
+    Config.ManualFly = enabled
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    if enabled then
+        flyPart = Instance.new("BodyVelocity")
+        flyPart.Velocity = Vector3.new(0,0,0)
+        flyPart.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        flyPart.Parent = root
+    else
+        if flyPart then flyPart:Destroy() end
+    end
+end
+
+-- AUTO MERGE LOGIC (HYBRID)
 local SafeZonePart = Instance.new("Part")
-SafeZonePart.Name = "ReyzimSafeZone"
 SafeZonePart.Shape = Enum.PartType.Ball
 SafeZonePart.Material = Enum.Material.ForceField
 SafeZonePart.Color = Color3.fromRGB(255, 0, 0)
@@ -156,47 +232,13 @@ SafeZonePart.CanCollide = false
 SafeZonePart.Anchored = true
 SafeZonePart.Parent = workspace
 
--- [ LÓGICA DE FUNCIONAMENTO ]
+local function getRoot() return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") end
 
-local function getRoot()
-    return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-end
+-- [ UI ELEMENTS ]
 
-local function teleportTo(targetCFrame)
-    local root = getRoot()
-    if root then
-        root.CFrame = targetCFrame
-    end
-end
-
-local function findHoles()
-    local holesFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Holes")
-    if not holesFolder then return {} end
-    
-    local found = {}
-    for _, hole in pairs(holesFolder:GetChildren()) do
-        local pos = hole:GetPivot().Position
-        local dist = (pos - SafeZonePart.Position).Magnitude
-        
-        if dist <= Config.Range then
-            local tier = hole:GetAttribute("Tier")
-            local id = hole:GetAttribute("HoleId")
-            if tier and id then
-                if not found[tier] then found[tier] = {} end
-                table.insert(found[tier], {obj = hole, id = id, pos = pos})
-            end
-        end
-    end
-    return found
-end
-
--- Toggles
-ToggleBtn.MouseButton1Click:Connect(function()
-    Config.Enabled = not Config.Enabled
-    ToggleBtn.Text = Config.Enabled and "HYBRID MERGE: ON" or "HYBRID MERGE: OFF"
-    ToggleBtn.BackgroundColor3 = Config.Enabled and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(50, 0, 0)
-    
-    if Config.Enabled then
+createToggle("AUTO MERGE (HYBRID)", function(v)
+    Config.Enabled = v
+    if v then
         local root = getRoot()
         if root then
             SafeZonePart.Position = root.Position
@@ -208,78 +250,87 @@ ToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-ShieldBtn.MouseButton1Click:Connect(function()
-    Config.AutoShield = not Config.AutoShield
-    ShieldBtn.Text = Config.AutoShield and "AUTO SHIELD: ON" or "AUTO SHIELD: OFF"
-    ShieldBtn.BackgroundColor3 = Config.AutoShield and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(50, 0, 0)
-end)
-
-RangeInput.FocusLost:Connect(function()
-    local val = tonumber(RangeInput.Text)
-    if val then
-        Config.Range = val
-        SafeZonePart.Size = Vector3.new(val * 2, val * 2, val * 2)
-    else
-        RangeInput.Text = tostring(Config.Range)
+createTextBox("RAIO DA ÁREA (NÚMERO)", function(v)
+    local n = tonumber(v)
+    if n then 
+        Config.Range = n 
+        SafeZonePart.Size = Vector3.new(n * 2, n * 2, n * 2)
     end
 end)
 
-FloatingLogo.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
+createToggle("ESP PLAYERS", function(v)
+    Config.ESPEnabled = v
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Character and p.Character:FindFirstChild("ReyzimESP") then
+            p.Character.ReyzimESP.Enabled = v
+        end
+    end
 end)
 
--- Loop do Escudo (10 segundos)
+createToggle("MANUAL FLY", toggleFly)
+
+local targetPlayer = ""
+createTextBox("NOME DO JOGADOR", function(v) targetPlayer = v end)
+createButton("TELEPORTAR PARA JOGADOR", function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Name:lower():find(targetPlayer:lower()) and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local root = getRoot()
+            if root then root.CFrame = p.Character.HumanoidRootPart.CFrame end
+            break
+        end
+    end
+end)
+
+createToggle("AUTO SHIELD", function(v) Config.AutoShield = v end)
+
+-- [ LOOPS ]
+
+-- Loop do Escudo
 task.spawn(function()
     while true do
-        if Config.AutoShield then
-            pcall(function() ShieldRemote:InvokeServer() end)
-        end
+        if Config.AutoShield then pcall(function() ShieldRemote:InvokeServer() end) end
         task.wait(10)
     end
 end)
 
--- Main Loop (Hybrid: Telekinesis to Player + Instant Teleport to Target)
+-- Loop do Merge
 task.spawn(function()
-    local originalPos = nil
     while true do
-        if Config.Enabled then
+        if Config.Enabled and not Config.ManualFly then
             local root = getRoot()
             if root then
-                local allHoles = findHoles()
+                local holesFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Holes")
                 local foundPair = false
-                
-                for tier, list in pairs(allHoles) do
-                    if #list >= 2 then
-                        foundPair = true
-                        local h1 = list[1]
-                        local h2 = list[2]
-                        
-                        -- 1. Puxa o primeiro Hole para o Jogador
-                        pcall(function()
-                            HoleMoveRemote:InvokeServer(h1.id, root.Position)
-                        end)
-                        task.wait(0.2)
-                        
-                        -- 2. Teleporta o Jogador para o primeiro Hole (para garantir que o servidor registre o "pegar")
-                        teleportTo(h1.obj:GetPivot())
-                        task.wait(0.2)
-                        
-                        -- 3. Teleporta o Jogador (com o Hole 1) para a posição do Hole 2
-                        teleportTo(h2.obj:GetPivot())
-                        task.wait(0.3)
-                        
-                        -- 4. Volta para a posição de voo acima da SafeZone
-                        teleportTo(CFrame.new(SafeZonePart.Position + Vector3.new(0, Config.FlyHeight, 0)))
-                        break 
+                if holesFolder then
+                    local holes = {}
+                    for _, h in pairs(holesFolder:GetChildren()) do
+                        local dist = (h:GetPivot().Position - SafeZonePart.Position).Magnitude
+                        if dist <= Config.Range then
+                            local t = h:GetAttribute("Tier")
+                            local id = h:GetAttribute("HoleId")
+                            if t and id then
+                                if not holes[t] then holes[t] = {} end
+                                table.insert(holes[t], {obj = h, id = id})
+                            end
+                        end
+                    end
+                    for tier, list in pairs(holes) do
+                        if #list >= 2 then
+                            foundPair = true
+                            pcall(function() HoleMoveRemote:InvokeServer(list[1].id, root.Position) end)
+                            task.wait(0.2)
+                            root.CFrame = list[1].obj:GetPivot()
+                            task.wait(0.2)
+                            root.CFrame = list[2].obj:GetPivot()
+                            task.wait(0.3)
+                            root.CFrame = CFrame.new(SafeZonePart.Position + Vector3.new(0, Config.FlyHeight, 0))
+                            break
+                        end
                     end
                 end
-                
-                -- Se não houver par, mantém o voo
                 if not foundPair then
                     local flyPos = SafeZonePart.Position + Vector3.new(0, Config.FlyHeight, 0)
-                    if (root.Position - flyPos).Magnitude > 5 then
-                        teleportTo(CFrame.new(flyPos))
-                    end
+                    if (root.Position - flyPos).Magnitude > 5 then root.CFrame = CFrame.new(flyPos) end
                 end
             end
         end
@@ -287,7 +338,12 @@ task.spawn(function()
     end
 end)
 
--- FPS
+-- Visibilidade do Menu
+FloatingLogo.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- FPS e Fly Control
 local lastIteration, frameCount = tick(), 0
 RunService.RenderStepped:Connect(function()
     frameCount = frameCount + 1
@@ -296,6 +352,16 @@ RunService.RenderStepped:Connect(function()
         frameCount = 0
         lastIteration = tick()
     end
+    
+    if Config.ManualFly and flyPart then
+        local root = getRoot()
+        if root then
+            local camera = workspace.CurrentCamera
+            local moveDir = Vector3.new(0,0,0)
+            -- Simplificado para mobile: voa para onde a camera olha
+            flyPart.Velocity = camera.CFrame.LookVector * Config.FlySpeed
+        end
+    end
 end)
 
-print("Reyzim Hole Merger Hybrid Loaded!")
+print("Reyzim V3 Ultimate Loaded!")
