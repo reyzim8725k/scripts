@@ -1,6 +1,6 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║               REYZIM COMBO MASTER - V1                   ║
+    ║               REYZIM COMBO MASTER - V1.1                 ║
     ║        TEMA: RED EDITION | MOBILE COMBO SYSTEM           ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
@@ -21,6 +21,22 @@ local ComboData = {
 }
 local SaveFile = "ReyzimComboSave.json"
 
+-- Mapeamento de teclas para Enum.KeyCode
+local KeyMapping = {
+    ["1"] = Enum.KeyCode.One,
+    ["2"] = Enum.KeyCode.Two,
+    ["3"] = Enum.KeyCode.Three,
+    ["4"] = Enum.KeyCode.Four,
+    ["5"] = Enum.KeyCode.Five,
+    ["6"] = Enum.KeyCode.Six,
+    ["X"] = Enum.KeyCode.X,
+    ["V"] = Enum.KeyCode.V,
+    ["F"] = Enum.KeyCode.F,
+    ["C"] = Enum.KeyCode.C,
+    ["A"] = Enum.KeyCode.A,
+    ["Z"] = Enum.KeyCode.Z
+}
+
 -- [ FUNÇÕES DE SISTEMA ]
 local function saveCombo()
     local data = HttpService:JSONEncode(ComboData.Sequence)
@@ -36,13 +52,16 @@ end
 
 local function executeCombo()
     for _, item in ipairs(ComboData.Sequence) do
-        local key = item.key
+        local keyStr = item.key
+        local keyCode = KeyMapping[keyStr]
         local delayTime = tonumber(item.delay) or 0
         
-        -- Simula o pressionamento da tecla
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode[key:upper()], false, game)
-        task.wait(0.05)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode[key:upper()], false, game)
+        if keyCode then
+            -- Simula o pressionamento da tecla
+            VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+        end
         
         if delayTime > 0 then
             task.wait(delayTime)
@@ -123,7 +142,7 @@ MainStroke.Parent = MainFrame
 
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "COMBO MASTER V1"
+Title.Text = "COMBO MASTER V1.1"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
@@ -146,7 +165,7 @@ KeyContainer.Position = UDim2.new(0, 10, 0, 45)
 KeyContainer.Size = UDim2.new(1, -20, 0, 80)
 KeyContainer.BackgroundTransparency = 1
 
-local keys = {"1", "2", "3", "4", "5", "6", "X", "V", "F", "C", "A"}
+local keys = {"1", "2", "3", "4", "5", "6", "Z", "X", "V", "F", "C", "A"}
 local UIListLayoutKeys = Instance.new("UIGridLayout")
 UIListLayoutKeys.Parent = KeyContainer
 UIListLayoutKeys.CellSize = UDim2.new(0, 35, 0, 35)
@@ -296,4 +315,4 @@ end)
 loadCombo()
 updateSeqUI()
 
-print("Reyzim Combo Master Loaded!")
+print("Reyzim Combo Master V1.1 Loaded!")
