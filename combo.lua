@@ -1,31 +1,37 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║               REYZIM COMBO MASTER - V1.2                 ║
-    ║        TEMA: RED EDITION | MOBILE COMBO SYSTEM           ║
+    ║               REYZIM COMBO MASTER - V1.3                 ║
+    ║        TEMA: RED EDITION | COMBAT & COMBO SYSTEM         ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
 ]]
 
 print("-----------------------------------------")
-print("Reyzim Combo Master V1.2 Carregando...")
+print("Reyzim Combo Master V1.3 Carregando...")
 print("-----------------------------------------")
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
 -- Remove versões antigas
 if CoreGui:FindFirstChild("ReyzimComboUI") then CoreGui.ReyzimComboUI:Destroy() end
 
 -- [ CONFIGURAÇÕES ]
 local ComboData = {
-    Sequence = {}, -- {key = "X", delay = 0.0}
+    Sequence = {},
+}
+local Config = {
+    AimbotEnabled = false,
+    AimbotSensitivity = 0.5,
 }
 local SaveFile = "ReyzimComboSave.json"
 
--- Mapeamento SEGURO de teclas para Enum.KeyCode
+-- Mapeamento de teclas para Enum.KeyCode
 local KeyMapping = {
     ["1"] = Enum.KeyCode.One,
     ["2"] = Enum.KeyCode.Two,
@@ -42,11 +48,10 @@ local KeyMapping = {
 
 -- [ FUNÇÕES DE SISTEMA ]
 local function saveCombo()
-    local success, err = pcall(function()
+    pcall(function()
         local data = HttpService:JSONEncode(ComboData.Sequence)
         writefile(SaveFile, data)
     end)
-    if not success then warn("Erro ao salvar: " .. tostring(err)) end
 end
 
 local function loadCombo()
@@ -65,7 +70,6 @@ local function executeCombo()
         local delayTime = tonumber(item.delay) or 0
         
         if keyCode then
-            -- Simula o pressionamento da tecla de forma segura
             pcall(function()
                 VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
                 task.wait(0.05)
@@ -77,6 +81,23 @@ local function executeCombo()
             task.wait(delayTime)
         end
     end
+end
+
+-- Função para encontrar o jogador mais próximo
+local function getClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local distance = (player.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if distance < shortestDistance then
+                closestPlayer = player
+                shortestDistance = distance
+            end
+        end
+    end
+    return closestPlayer
 end
 
 -- [ INTERFACE CUSTOMIZADA ]
@@ -93,7 +114,7 @@ local FloatingStroke = Instance.new("UIStroke")
 FloatingLogo.Name = "FloatingLogo"
 FloatingLogo.Parent = ScreenGui
 FloatingLogo.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
-FloatingLogo.Position = UDim2.new(0.1, 0, 0.4, 0)
+FloatingLogo.Position = UDim2.new(0.1, 0, 0.3, 0)
 FloatingLogo.Size = UDim2.new(0, 50, 0, 50)
 FloatingLogo.Image = "https://raw.githubusercontent.com/gtzimooo/raw-poder-remove/refs/heads/main/file_000000007644720ea092ead937d3b54d.png"
 FloatingLogo.Draggable = true
@@ -106,7 +127,7 @@ FloatingStroke.Color = Color3.fromRGB(255, 0, 0)
 FloatingStroke.Thickness = 2
 FloatingStroke.Parent = FloatingLogo
 
--- Botão de Execução Rápida (Separado)
+-- Botão de Execução de Combo (Separado)
 local ExecButton = Instance.new("TextButton")
 local ExecCorner = Instance.new("UICorner")
 local ExecStroke = Instance.new("UIStroke")
@@ -114,7 +135,7 @@ local ExecStroke = Instance.new("UIStroke")
 ExecButton.Name = "ExecButton"
 ExecButton.Parent = ScreenGui
 ExecButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-ExecButton.Position = UDim2.new(0.1, 0, 0.6, 0)
+ExecButton.Position = UDim2.new(0.1, 0, 0.45, 0)
 ExecButton.Size = UDim2.new(0, 60, 0, 60)
 ExecButton.Text = "COMBO"
 ExecButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -129,6 +150,30 @@ ExecCorner.Parent = ExecButton
 ExecStroke.Color = Color3.fromRGB(255, 255, 255)
 ExecStroke.Thickness = 2
 ExecStroke.Parent = ExecButton
+
+-- Botão de Aimbot (Separado)
+local AimButton = Instance.new("TextButton")
+local AimCorner = Instance.new("UICorner")
+local AimStroke = Instance.new("UIStroke")
+
+AimButton.Name = "AimButton"
+AimButton.Parent = ScreenGui
+AimButton.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+AimButton.Position = UDim2.new(0.1, 0, 0.6, 0)
+AimButton.Size = UDim2.new(0, 60, 0, 60)
+AimButton.Text = "AIM: OFF"
+AimButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+AimButton.Font = Enum.Font.GothamBold
+AimButton.TextSize = 12
+AimButton.Draggable = true
+AimButton.Active = true
+
+AimCorner.CornerRadius = UDim.new(1, 0)
+AimCorner.Parent = AimButton
+
+AimStroke.Color = Color3.fromRGB(255, 0, 0)
+AimStroke.Thickness = 2
+AimStroke.Parent = AimButton
 
 -- Painel Principal
 local MainFrame = Instance.new("Frame")
@@ -153,7 +198,7 @@ MainStroke.Parent = MainFrame
 
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "COMBO MASTER V1.2"
+Title.Text = "COMBO MASTER V1.3"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
@@ -321,8 +366,27 @@ ExecButton.MouseButton1Click:Connect(function()
     executeCombo()
 end)
 
+AimButton.MouseButton1Click:Connect(function()
+    Config.AimbotEnabled = not Config.AimbotEnabled
+    AimButton.Text = Config.AimbotEnabled and "AIM: ON" or "AIM: OFF"
+    AimButton.BackgroundColor3 = Config.AimbotEnabled and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(40, 0, 0)
+end)
+
+-- [ LOOPS ]
+
+-- Loop do Aimbot Câmera
+RunService.RenderStepped:Connect(function()
+    if Config.AimbotEnabled then
+        local target = getClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = target.Character.HumanoidRootPart.Position
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+        end
+    end
+end)
+
 -- Inicialização
 loadCombo()
 updateSeqUI()
 
-print("Reyzim Combo Master V1.2 Carregado com Sucesso!")
+print("Reyzim Combo Master V1.3 Carregado com Sucesso!")
