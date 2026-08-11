@@ -1,6 +1,6 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║                 REYZIM MAGNET PRO - V1                   ║
+    ║                 REYZIM MAGNET PRO - V1.1                 ║
     ║        TEMA: RED EDITION | OBJECT ATTRACTION SYSTEM      ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
@@ -17,7 +17,6 @@ if CoreGui:FindFirstChild("ReyzimMagnetUI") then CoreGui.ReyzimMagnetUI:Destroy(
 -- [ CONFIGURAÇÕES ]
 local Config = {
     Enabled = false,
-    MagnetSpeed = 0.5, -- Velocidade de atração
 }
 
 -- [ INTERFACE CUSTOMIZADA ]
@@ -79,7 +78,7 @@ MainStroke.Parent = MainFrame
 
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "MAGNET PRO V1"
+Title.Text = "MAGNET PRO V1.1"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
@@ -132,20 +131,20 @@ task.spawn(function()
     while true do
         if Config.Enabled then
             local root = getRoot()
-            local roads = workspace:FindFirstChild("Roads")
+            local eatable = workspace:FindFirstChild("Eatable")
             
-            if root and roads then
-                for _, item in pairs(roads:GetChildren()) do
+            if root and eatable then
+                for _, item in pairs(eatable:GetChildren()) do
                     if item:IsA("BasePart") then
                         item.CFrame = root.CFrame
-                        item.Velocity = Vector3.new(0,0,0) -- Para não sair voando
+                        item.Velocity = Vector3.new(0,0,0)
                     elseif item:IsA("Model") then
                         item:PivotTo(root.CFrame)
                     end
                 end
             end
         end
-        task.wait(0.1) -- Delay pequeno para não lagar
+        task.wait(0.1)
     end
 end)
 
@@ -160,4 +159,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("Reyzim Magnet Pro Loaded!")
+print("Reyzim Magnet Pro V1.1 Loaded!")
