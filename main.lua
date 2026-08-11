@@ -1,14 +1,13 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║              REYZIM HOLE MERGER - GOD MODE               ║
-    ║        TEMA: RED EDITION | TELEPORT & FLY SYSTEM         ║
+    ║             REYZIM HOLE MERGER - TELEKINESIS             ║
+    ║        TEMA: RED EDITION | REMOTE MOVE SYSTEM            ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
 ]]
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
@@ -20,13 +19,12 @@ if CoreGui:FindFirstChild("ReyzimHoleMergerUI") then CoreGui.ReyzimHoleMergerUI:
 local Config = {
     Enabled = false,
     Range = 50,
-    SafeZoneVisible = true,
     AutoShield = true,
-    FlyHeight = 25 -- Altura do voo acima da safezone
 }
 
 -- [ REMOTES ]
 local ShieldRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")["sleitnick_knit@1.7.0"].knit.Services.ShieldService.RF.ActivateShield
+local HoleMoveRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")["sleitnick_knit@1.7.0"].knit.Services.HoleService.RF.RequestMove
 
 -- [ INTERFACE CUSTOMIZADA ]
 local ScreenGui = Instance.new("ScreenGui")
@@ -87,7 +85,7 @@ MainStroke.Parent = MainFrame
 
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "HOLE GOD MODE"
+Title.Text = "HOLE TELEKINESIS"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
@@ -119,7 +117,7 @@ local function createButton(text, pos, parent)
     return btn
 end
 
-local ToggleBtn = createButton("GOD MERGE: OFF", UDim2.new(0.1, 0, 0.2, 0), MainFrame)
+local ToggleBtn = createButton("TELEKINESIS: OFF", UDim2.new(0.1, 0, 0.2, 0), MainFrame)
 local ShieldBtn = createButton("AUTO SHIELD: ON", UDim2.new(0.1, 0, 0.38, 0), MainFrame)
 ShieldBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 
@@ -161,13 +159,6 @@ local function getRoot()
     return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 end
 
-local function teleportTo(targetCFrame)
-    local root = getRoot()
-    if root then
-        root.CFrame = targetCFrame
-    end
-end
-
 local function findHoles()
     local holesFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Holes")
     if not holesFolder then return {} end
@@ -179,9 +170,10 @@ local function findHoles()
         
         if dist <= Config.Range then
             local tier = hole:GetAttribute("Tier")
-            if tier then
+            local id = hole:GetAttribute("HoleId")
+            if tier and id then
                 if not found[tier] then found[tier] = {} end
-                table.insert(found[tier], hole)
+                table.insert(found[tier], {obj = hole, id = id, pos = pos})
             end
         end
     end
@@ -191,7 +183,7 @@ end
 -- Toggles
 ToggleBtn.MouseButton1Click:Connect(function()
     Config.Enabled = not Config.Enabled
-    ToggleBtn.Text = Config.Enabled and "GOD MERGE: ON" or "GOD MERGE: OFF"
+    ToggleBtn.Text = Config.Enabled and "TELEKINESIS: ON" or "TELEKINESIS: OFF"
     ToggleBtn.BackgroundColor3 = Config.Enabled and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(50, 0, 0)
     
     if Config.Enabled then
@@ -236,45 +228,27 @@ task.spawn(function()
     end
 end)
 
--- Main Loop (God Mode: Fly & Instant Teleport)
+-- Main Loop (Telekinesis: Move Holes to each other)
 task.spawn(function()
     while true do
         if Config.Enabled then
-            local root = getRoot()
-            if root then
-                local allHoles = findHoles()
-                local foundPair = false
-                
-                for tier, list in pairs(allHoles) do
-                    if #list >= 2 then
-                        foundPair = true
-                        local h1 = list[1]
-                        local h2 = list[2]
-                        
-                        -- Teleporte Instantâneo para o primeiro
-                        teleportTo(h1:GetPivot())
-                        task.wait(0.2)
-                        
-                        -- Teleporte Instantâneo para o segundo (Merge)
-                        teleportTo(h2:GetPivot())
-                        task.wait(0.3)
-                        
-                        -- Volta para a posição de voo acima da SafeZone
-                        teleportTo(CFrame.new(SafeZonePart.Position + Vector3.new(0, Config.FlyHeight, 0)))
-                        break 
-                    end
-                end
-                
-                -- Se não houver par, mantém o voo
-                if not foundPair then
-                    local flyPos = SafeZonePart.Position + Vector3.new(0, Config.FlyHeight, 0)
-                    if (root.Position - flyPos).Magnitude > 5 then
-                        teleportTo(CFrame.new(flyPos))
-                    end
+            local allHoles = findHoles()
+            
+            for tier, list in pairs(allHoles) do
+                if #list >= 2 then
+                    local h1 = list[1]
+                    local h2 = list[2]
+                    
+                    -- Move o primeiro Hole para a posição do segundo Hole
+                    pcall(function()
+                        HoleMoveRemote:InvokeServer(h1.id, h2.pos)
+                    end)
+                    
+                    task.wait(0.3) -- Pequeno delay para processar a fusão
                 end
             end
         end
-        task.wait(0.1)
+        task.wait(0.2)
     end
 end)
 
@@ -289,4 +263,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("Reyzim Hole Merger God Mode Loaded!")
+print("Reyzim Hole Merger Telekinesis Loaded!")
