@@ -1,6 +1,6 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║               SWORD MASTER PRO - SELECTION MODE          ║
+    ║               SWORD MASTER PRO - ACTIVE SCAN             ║
     ║        TEMA: SUPER RED | SEM BIBLIOTECAS EXTERNAS        ║
     ║          100% COMPATÍVEL COM DELTA / MOBILE              ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
@@ -24,6 +24,7 @@ local espadasConfig = {
     {nome = "Oroshi", meta = 300, selecionada = false, encontrada = false}
 }
 _G.MasteryEnabled = false
+local scanning = false
 
 -- [ CRIAÇÃO DA INTERFACE ]
 local ScreenGui = Instance.new("ScreenGui")
@@ -114,7 +115,7 @@ StatusLabel.Parent = MainFrame
 StatusLabel.Position = UDim2.new(0, 10, 0, 40)
 StatusLabel.Size = UDim2.new(1, -20, 0, 20)
 StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "Status: Verifique o Inventário"
+StatusLabel.Text = "Status: Clique em Verificar"
 StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 StatusLabel.Font = Enum.Font.GothamSemibold
 StatusLabel.TextSize = 11
@@ -232,16 +233,36 @@ local function updateUI()
 end
 
 local function checkInventory()
-    StatusLabel.Text = "Status: Verificando inventário..."
-    for _, espada in ipairs(espadasConfig) do
-        local item = LocalPlayer.Backpack:FindFirstChild(espada.nome) or LocalPlayer.Character:FindFirstChild(espada.nome)
-        if item then
-            espada.encontrada = true
-        else
-            espada.encontrada = false
+    if scanning then return end
+    scanning = true
+    CheckBtn.Text = "VARRENDO..."
+    CheckBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    
+    task.spawn(function()
+        for _, espada in ipairs(espadasConfig) do
+            StatusLabel.Text = "Status: Testando " .. espada.nome .. "..."
+            FloatingText.Text = "Testando " .. espada.nome
+            
+            -- Tenta equipar ativamente
+            pcall(function() 
+                game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("LoadItem", espada.nome) 
+            end)
+            task.wait(1.5) -- Espera o servidor processar
+            
+            local item = LocalPlayer.Backpack:FindFirstChild(espada.nome) or LocalPlayer.Character:FindFirstChild(espada.nome)
+            if item then
+                espada.encontrada = true
+            else
+                espada.encontrada = false
+            end
         end
-    end
-    updateUI()
+        
+        scanning = false
+        CheckBtn.Text = "VERIFICAR"
+        CheckBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        FloatingText.Text = "Varredura Concluída"
+        updateUI()
+    end)
 end
 
 -- [ LÓGICA DE INTERAÇÃO ]
@@ -254,6 +275,7 @@ CheckBtn.MouseButton1Click:Connect(function()
 end)
 
 StartBtn.MouseButton1Click:Connect(function()
+    if scanning then return end
     if not _G.MasteryEnabled then
         local hasSelection = false
         for _, e in ipairs(espadasConfig) do if e.selecionada and e.encontrada then hasSelection = true break end end
@@ -331,5 +353,5 @@ FloatingLogo.Changed:Connect(function()
     FloatingContainer.Position = FloatingLogo.Position
 end)
 
--- Inicia verificando
-checkInventory()
+-- Inicia pedindo para verificar
+StatusLabel.Text = "Status: Clique em Verificar para escanear."
