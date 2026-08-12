@@ -1,11 +1,15 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║               SWORD MASTER PRO - ACTIVE SCAN             ║
-    ║        TEMA: SUPER RED | SEM BIBLIOTECAS EXTERNAS        ║
+    ║               SWORD MASTER PRO - V2.0                    ║
+    ║        TEMA: SUPER RED | ACTIVE SCAN EDITION             ║
     ║          100% COMPATÍVEL COM DELTA / MOBILE              ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
 ]]
+
+print("-----------------------------------------")
+print("Reyzim Sword Master V2.0 - INICIADO")
+print("-----------------------------------------")
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -67,7 +71,7 @@ FloatingText.Position = UDim2.new(0, -20, 0, 65)
 FloatingText.Size = UDim2.new(0, 100, 0, 20)
 FloatingText.BackgroundTransparency = 0.5
 FloatingText.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-FloatingText.Text = "Aguardando..."
+FloatingText.Text = "Iniciando..."
 FloatingText.TextColor3 = Color3.fromRGB(255, 255, 255)
 FloatingText.Font = Enum.Font.GothamBold
 FloatingText.TextSize = 10
@@ -105,7 +109,7 @@ Title.Name = "Title"
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 45)
 Title.BackgroundTransparency = 1
-Title.Text = "SWORD MASTER PRO"
+Title.Text = "SWORD MASTER V2.0"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
@@ -115,8 +119,8 @@ StatusLabel.Parent = MainFrame
 StatusLabel.Position = UDim2.new(0, 10, 0, 40)
 StatusLabel.Size = UDim2.new(1, -20, 0, 20)
 StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "Status: Clique em Verificar"
-StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+StatusLabel.Text = "Status: Escaneando..."
+StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 StatusLabel.Font = Enum.Font.GothamSemibold
 StatusLabel.TextSize = 11
 StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -241,26 +245,29 @@ local function checkInventory()
     task.spawn(function()
         for _, espada in ipairs(espadasConfig) do
             StatusLabel.Text = "Status: Testando " .. espada.nome .. "..."
-            FloatingText.Text = "Testando " .. espada.nome
+            FloatingText.Text = "Escanear: " .. espada.nome
             
-            -- Tenta equipar ativamente
+            -- Tenta equipar ativamente enviando o comando para o servidor
             pcall(function() 
                 game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("LoadItem", espada.nome) 
             end)
-            task.wait(1.5) -- Espera o servidor processar
+            task.wait(1.2) -- Tempo para o servidor processar o equipamento
             
+            -- Verifica se a espada apareceu no Character ou Backpack
             local item = LocalPlayer.Backpack:FindFirstChild(espada.nome) or LocalPlayer.Character:FindFirstChild(espada.nome)
             if item then
                 espada.encontrada = true
+                print("Encontrada: " .. espada.nome)
             else
                 espada.encontrada = false
+                print("Não encontrada: " .. espada.nome)
             end
         end
         
         scanning = false
         CheckBtn.Text = "VERIFICAR"
         CheckBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        FloatingText.Text = "Varredura Concluída"
+        FloatingText.Text = "Varredura OK"
         updateUI()
     end)
 end
@@ -353,5 +360,6 @@ FloatingLogo.Changed:Connect(function()
     FloatingContainer.Position = FloatingLogo.Position
 end)
 
--- Inicia pedindo para verificar
-StatusLabel.Text = "Status: Clique em Verificar para escanear."
+-- INICIA A VARREDURA AUTOMÁTICA AO CARREGAR
+task.wait(2)
+checkInventory()
