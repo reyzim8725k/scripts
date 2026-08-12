@@ -1,7 +1,7 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║               REYZIM SCRIPTS - TELEGRAM LOG V2           ║
-    ║        USANDO REQUEST PARA BYPASS DE BLOQUEIO            ║
+    ║               REYZIM SCRIPTS - TELEGRAM LOG V3           ║
+    ║        MÉTODO GET: BYPASS TOTAL DE BLOQUEIO              ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
 ]]
@@ -9,14 +9,20 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local MarketplaceService = game:GetService("MarketplaceService")
-local HttpService = game:GetService("HttpService")
 
 -- [ CONFIGURAÇÕES ]
 local TOKEN = "8500284543:AAGzMLvtIBmRVPzgMYEo9tdqd2GHoW6TUPI"
 local CHAT_ID = "8766981973"
 
--- Função universal de request para executores (Delta, Fluxus, etc)
-local httpRequest = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+-- Função para codificar texto para URL (Transforma espaços em %20, etc)
+local function urlEncode(str)
+    str = string.gsub(str, "\n", "\r\n")
+    str = string.gsub(str, "([^%w %-%_%.%~])", function(c)
+        return string.format("%%%02X", string.byte(c))
+    end)
+    str = string.gsub(str, " ", "%%20")
+    return str
+end
 
 local function getDeviceInfo()
     local platform = "Desconhecido"
@@ -38,7 +44,6 @@ local function enviarLogTelegram()
         local lp = Players.LocalPlayer
         local gameName = "Desconhecido"
         
-        -- Pega o nome do jogo com segurança
         pcall(function()
             gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
         end)
@@ -47,41 +52,34 @@ local function enviarLogTelegram()
         local device = getDeviceInfo()
         local jobId = game.JobId or "N/A"
         
-        -- Montando a mensagem formatada
-        local mensagem = "🚀 *NOVA EXECUÇÃO - REYZIM SCRIPTS*\n\n" ..
-                         "👤 *Usuário:* " .. lp.Name .. " (" .. lp.DisplayName .. ")\n" ..
-                         "⏰ *Horário:* " .. time .. "\n" ..
-                         "📱 *Celular Info:* " .. device .. "\n" ..
-                         "🎮 *Game:* " .. gameName .. "\n" ..
-                         "🆔 *Server ID:* `" .. jobId .. "`"
+        -- Montando a mensagem (Sem Markdown complexo para evitar erros no GET)
+        local mensagem = "REYZIM SCRIPTS - LOG\n\n" ..
+                         "Usuario: " .. lp.Name .. "\n" ..
+                         "Horario: " .. time .. "\n" ..
+                         "Celular: " .. device .. "\n" ..
+                         "Game: " .. gameName .. "\n" ..
+                         "ServerID: " .. jobId
 
-        local url = "https://api.telegram.org/bot" .. TOKEN .. "/sendMessage"
+        -- O segredo: Enviar via GET usando a URL do Telegram
+        local url = "https://api.telegram.org/bot" .. TOKEN .. "/sendMessage?chat_id=" .. CHAT_ID .. "&text=" .. urlEncode(mensagem)
         
-        local data = {
-            ["chat_id"] = CHAT_ID,
-            ["text"] = mensagem,
-            ["parse_mode"] = "Markdown"
-        }
+        local success, result = pcall(function()
+            return game:HttpGet(url)
+        end)
         
-        if httpRequest then
-            local success, response = pcall(function()
-                return httpRequest({
-                    Url = url,
-                    Method = "POST",
-                    Headers = {
-                        ["Content-Type"] = "application/json"
-                    },
-                    Body = HttpService:JSONEncode(data)
-                })
-            end)
-            
-            if success then
-                print("✅ Log enviado com sucesso via Executor Request!")
-            else
-                warn("❌ Erro ao enviar log via Request: " .. tostring(response))
-            end
+        if success then
+            print("✅ Log enviado com sucesso via GET Bypass!")
         else
-            warn("❌ Seu executor não suporta a função 'request'.")
+            -- Se o HttpGet do game falhar, tenta o do executor
+            local execGet = (syn and syn.request) or (http and http.request) or request
+            if execGet then
+                pcall(function()
+                    execGet({Url = url, Method = "GET"})
+                end)
+                print("✅ Log enviado via Executor Bypass!")
+            else
+                warn("❌ Falha total ao enviar log.")
+            end
         end
     end)
 end
