@@ -74,44 +74,40 @@ local function updateStatus(txt)
     print("[REYZIM] " .. txt)
 end
 
--- Lógica de Server Hop Persistente
+-- Lógica de Server Hop (Novo método do usuário)
 local function serverHop()
     updateStatus("Hop Persistente...")
+    local Player = game.Players.LocalPlayer    
+    local Http = game:GetService("HttpService")
+    local TPS = game:GetService("TeleportService")
+    local Api = "https://games.roblox.com/v1/games/"
+    local _place, _id = game.PlaceId, game.JobId
+    local _servers = Api.._place.."/servers/Public?sortOrder=Asc&limit=10"
     
-    local function tryTeleport()
-        local Servers = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-        local function ListServers(cursor)
-            local success, raw = pcall(function() return game:HttpGet(Servers .. ((cursor and "&cursor=" .. cursor) or "")) end)
-            if success then return HttpService:JSONDecode(raw) end
-        end
-
-        local Next = nil
-        local data = ListServers(Next)
-        
-        if data and data.data then
-            -- Tenta vários servidores da lista para aumentar a chance
-            for i = 1, #data.data do
-                local s = data.data[i]
-                if s.playing < s.maxPlayers and s.id ~= game.JobId then
-                    updateStatus("Tentando Server...")
-                    local success, err = pcall(function()
-                        TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
-                    end)
-                    
-                    task.wait(3) -- Espera um pouco para ver se o teleporte inicia
-                    
-                    if not success then
-                        warn("Falha ao teleportar para " .. s.id .. ": " .. tostring(err))
-                    end
-                end
-            end
-        end
+    local function ListServers(cursor)
+       local success, Raw = pcall(function() return game:HttpGet(_servers .. ((cursor and "&cursor="..cursor) or "")) end)
+       if success then return Http:JSONDecode(Raw) end
     end
 
-    -- Loop infinito até o jogador sair do servidor
-    while task.wait(5) do
-        tryTeleport()
-        updateStatus("Retentando Hop...")
+    -- Loop de Hop persistente (Sem os 120s)
+    while task.wait(1) do
+        pcall(function()
+            updateStatus("Procurando Server...")
+            -- Ancorar player antes do teleporte
+            if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+                Player.Character.HumanoidRootPart.Anchored = true
+            end
+            
+            local Servers = ListServers()
+            if Servers and Servers.data and #Servers.data > 0 then
+                local Server = Servers.data[math.random(1,#Servers.data)]
+                if Server.id ~= _id then
+                    updateStatus("Teleportando...")
+                    TPS:TeleportToPlaceInstance(_place, Server.id, Player)
+                end
+            end
+        end)
+        task.wait(2) -- Pequena pausa para evitar sobrecarga de requisições
     end
 end
 
