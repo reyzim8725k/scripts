@@ -1,14 +1,14 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║               REYZIM SCRIPTS - KILL AURA V5              ║
-    ║        FAST ATTACK | NO DELAY | OTIMIZADO MOBILE         ║
+    ║               REYZIM SCRIPTS - KILL AURA V6              ║
+    ║        GOD RANGE (30KM) | NO LAG | TARGET COUNTER        ║
     ║          100% COMPATÍVEL COM MOBILE / DELTA              ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
 ]]
 
 print("-----------------------------------------")
-print("[REYZIM] KillAura Fast V5 - INICIADO")
+print("[REYZIM] KillAura God Range V6 - INICIADO")
 print("-----------------------------------------")
 
 local Players = game:GetService("Players")
@@ -21,9 +21,10 @@ if CoreGui:FindFirstChild("ReyzimKillExtreme") then CoreGui.ReyzimKillExtreme:De
 
 -- [ CONFIGURAÇÕES ]
 _G.KillAuraEnabled = false
-_G.KillAuraRange = 60
+_G.KillAuraRange = 500
 _G.AutoEquip = true
 _G.FastAttack = true
+_G.TargetCount = 0
 
 -- Remotes
 local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
@@ -47,12 +48,12 @@ FloatingContainer.Parent = ScreenGui
 FloatingContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 FloatingContainer.BackgroundTransparency = 1
 FloatingContainer.Position = UDim2.new(0.1, 0, 0.4, 0)
-FloatingContainer.Size = UDim2.new(0, 50, 0, 70)
+FloatingContainer.Size = UDim2.new(0, 60, 0, 80)
 
 FloatingLogo.Name = "FloatingLogo"
 FloatingLogo.Parent = FloatingContainer
 FloatingLogo.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-FloatingLogo.Size = UDim2.new(0, 50, 0, 50)
+FloatingLogo.Size = UDim2.new(0, 60, 0, 60)
 FloatingLogo.Image = "https://raw.githubusercontent.com/gtzimooo/raw-poder-remove/refs/heads/main/file_000000007644720ea092ead937d3b54d.png"
 FloatingLogo.Draggable = true
 FloatingLogo.Active = true
@@ -64,15 +65,15 @@ FloatingStroke.Parent = FloatingLogo
 
 StatusLabel.Name = "StatusLabel"
 StatusLabel.Parent = FloatingContainer
-StatusLabel.Position = UDim2.new(0, -25, 0, 55)
-StatusLabel.Size = UDim2.new(0, 100, 0, 15)
+StatusLabel.Position = UDim2.new(0, -20, 0, 65)
+StatusLabel.Size = UDim2.new(0, 100, 0, 20)
 StatusLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 StatusLabel.BackgroundTransparency = 0.5
-StatusLabel.Text = "FAST: OFF"
+StatusLabel.Text = "Targets: 0"
 StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 StatusLabel.Font = Enum.Font.GothamBold
-StatusLabel.TextSize = 8
-Instance.new("UICorner", StatusLabel).CornerRadius = UDim.new(0, 4)
+StatusLabel.TextSize = 9
+Instance.new("UICorner", StatusLabel).CornerRadius = UDim.new(0, 5)
 
 -- Painel Principal
 local MainFrame = Instance.new("Frame")
@@ -83,36 +84,36 @@ local Title = Instance.new("TextLabel")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-MainFrame.Position = UDim2.new(0.5, -90, 0.5, -100)
-MainFrame.Size = UDim2.new(0, 180, 0, 220)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -130)
+MainFrame.Size = UDim2.new(0, 200, 0, 260)
 MainFrame.Visible = false
 
-MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.CornerRadius = UDim.new(0, 15)
 MainCorner.Parent = MainFrame
 MainStroke.Color = Color3.fromRGB(255, 0, 0)
 MainStroke.Thickness = 1.5
 MainStroke.Parent = MainFrame
 
 Title.Parent = MainFrame
-Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Size = UDim2.new(1, 0, 0, 45)
 Title.BackgroundTransparency = 1
-Title.Text = "KILL AURA V5"
+Title.Text = "KILL AURA GOD V6"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 12
+Title.TextSize = 14
 
 -- Funções de Toggle
 local function createToggle(name, pos, default, callback)
     local btn = Instance.new("TextButton")
     btn.Parent = MainFrame
     btn.Position = pos
-    btn.Size = UDim2.new(1, -20, 0, 30)
+    btn.Size = UDim2.new(1, -20, 0, 35)
     btn.BackgroundColor3 = default and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(30, 30, 30)
     btn.Text = name .. ": " .. (default and "ON" or "OFF")
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 10
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.TextSize = 11
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
     
     local state = default
     btn.MouseButton1Click:Connect(function()
@@ -123,32 +124,43 @@ local function createToggle(name, pos, default, callback)
     end)
 end
 
-createToggle("KillAura", UDim2.new(0, 10, 0, 45), false, function(s) 
-    _G.KillAuraEnabled = s 
-    StatusLabel.Text = s and "FAST: ON" or "FAST: OFF"
+createToggle("KillAura", UDim2.new(0, 10, 0, 50), false, function(s) _G.KillAuraEnabled = s end)
+createToggle("Auto Equipar", UDim2.new(0, 10, 0, 95), true, function(s) _G.AutoEquip = s end)
+createToggle("Fast Attack", UDim2.new(0, 10, 0, 140), true, function(s) _G.FastAttack = s end)
+
+-- Range God Mode
+local RangeInput = Instance.new("TextBox")
+RangeInput.Parent = MainFrame
+RangeInput.Position = UDim2.new(0, 10, 0, 185)
+RangeInput.Size = UDim2.new(1, -20, 0, 35)
+RangeInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+RangeInput.Text = "500"
+RangeInput.PlaceholderText = "Range (Max 30000)"
+RangeInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+RangeInput.Font = Enum.Font.GothamBold
+RangeInput.TextSize = 12
+Instance.new("UICorner", RangeInput).CornerRadius = UDim.new(0, 8)
+
+RangeInput.FocusLost:Connect(function()
+    local val = tonumber(RangeInput.Text)
+    if val then
+        _G.KillAuraRange = math.clamp(val, 1, 30000)
+        RangeInput.Text = tostring(_G.KillAuraRange)
+        print("[REYZIM] God Range: " .. _G.KillAuraRange)
+    end
 end)
-createToggle("Auto Equipar", UDim2.new(0, 10, 0, 85), true, function(s) _G.AutoEquip = s end)
-createToggle("Fast Attack", UDim2.new(0, 10, 0, 125), true, function(s) _G.FastAttack = s end)
 
--- Range
-local RangeBtn = Instance.new("TextButton")
-RangeBtn.Parent = MainFrame
-RangeBtn.Position = UDim2.new(0, 10, 0, 165)
-RangeBtn.Size = UDim2.new(1, -20, 0, 30)
-RangeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-RangeBtn.Text = "Range: " .. _G.KillAuraRange
-RangeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-RangeBtn.Font = Enum.Font.GothamBold
-RangeBtn.TextSize = 10
-Instance.new("UICorner", RangeBtn).CornerRadius = UDim.new(0, 6)
+local Credits = Instance.new("TextLabel")
+Credits.Parent = MainFrame
+Credits.Position = UDim2.new(0, 0, 1, -25)
+Credits.Size = UDim2.new(1, 0, 0, 20)
+Credits.Text = "Reyzim Scripts | @reyzim_dz"
+Credits.TextColor3 = Color3.fromRGB(120, 0, 0)
+Credits.Font = Enum.Font.Gotham
+Credits.TextSize = 9
+Credits.BackgroundTransparency = 1
 
-RangeBtn.MouseButton1Click:Connect(function()
-    _G.KillAuraRange = _G.KillAuraRange + 20
-    if _G.KillAuraRange > 200 then _G.KillAuraRange = 40 end
-    RangeBtn.Text = "Range: " .. _G.KillAuraRange
-end)
-
--- [ LÓGICA OTIMIZADA V5 ]
+-- [ LÓGICA GOD RANGE V6 ]
 local function getTargets()
     local targets = {}
     local char = LocalPlayer.Character
@@ -156,10 +168,10 @@ local function getTargets()
     
     local myPos = char.HumanoidRootPart.Position
     
-    -- Busca otimizada: Apenas em pastas conhecidas primeiro
-    local enemyFolders = {workspace:FindFirstChild("Enemies"), workspace:FindFirstChild("NPCs")}
+    -- Busca otimizada em pastas específicas para performance extrema
+    local folders = {workspace:FindFirstChild("Enemies"), workspace:FindFirstChild("NPCs")}
     
-    for _, folder in pairs(enemyFolders) do
+    for _, folder in pairs(folders) do
         if folder then
             for _, v in pairs(folder:GetChildren()) do
                 if v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v.Humanoid.Health > 0 then
@@ -172,7 +184,7 @@ local function getTargets()
         end
     end
     
-    -- Fallback rápido se não achar nada nas pastas (apenas arredores imediatos)
+    -- Fallback para NPCs soltos no workspace (apenas se não achar nada nas pastas)
     if #targets == 0 then
         for _, v in pairs(workspace:GetChildren()) do
             if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v.Name ~= LocalPlayer.Name then
@@ -191,12 +203,7 @@ end
 
 task.spawn(function()
     while true do
-        -- Velocidade ajustável
-        if _G.FastAttack then
-            task.wait(0.01)
-        else
-            task.wait(0.1)
-        end
+        if _G.FastAttack then task.wait(0.01) else task.wait(0.1) end
         
         if _G.KillAuraEnabled then
             -- Auto Equip
@@ -209,6 +216,9 @@ task.spawn(function()
             end
             
             local targets = getTargets()
+            _G.TargetCount = #targets
+            StatusLabel.Text = "Targets: " .. _G.TargetCount
+            
             for _, target in pairs(targets) do
                 if not _G.KillAuraEnabled then break end
                 pcall(function()
@@ -221,6 +231,9 @@ task.spawn(function()
                     end
                 end)
             end
+        else
+            StatusLabel.Text = "Targets: 0"
+            task.wait(0.5)
         end
     end
 end)
