@@ -1,11 +1,15 @@
 --[[
     ╔══════════════════════════════════════════════════════════╗
-    ║               REYZIM SCRIPTS - KILL AURA EXTREME         ║
-    ║        RANGE: 30,000 METROS | TEMA: SUPER RED            ║
+    ║               REYZIM SCRIPTS - KILL AURA EXTREME V2      ║
+    ║        RANGE: 30,000 METROS | BUSCA UNIVERSAL            ║
     ║          100% COMPATÍVEL COM MOBILE / DELTA              ║
     ║        CRIADO POR: REYZIM | TIKTOK: @REYZIM_DZ           ║
     ╚══════════════════════════════════════════════════════════╝
 ]]
+
+print("-----------------------------------------")
+print("[REYZIM] KillAura Extreme V2 - INICIADO")
+print("-----------------------------------------")
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -17,10 +21,10 @@ if CoreGui:FindFirstChild("ReyzimKillExtreme") then CoreGui.ReyzimKillExtreme:De
 
 -- [ CONFIGURAÇÕES ]
 _G.KillAuraEnabled = false
-_G.KillAuraRange = 100 -- Inicia com 100, mas pode subir até 30.000
+_G.KillAuraRange = 500
 _G.AttackNPCs = true
 _G.AttackPlayers = false
-_G.AttackSpeed = 0.1 -- Velocidade do loop
+_G.AttackSpeed = 0.1 
 
 local AttackRemote = game:GetService("ReplicatedStorage").Modules.Net["RE/RegisterAttack"]
 
@@ -63,7 +67,7 @@ RangeDisplay.Position = UDim2.new(0, -20, 0, 65)
 RangeDisplay.Size = UDim2.new(0, 100, 0, 20)
 RangeDisplay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 RangeDisplay.BackgroundTransparency = 0.5
-RangeDisplay.Text = "Range: 100m"
+RangeDisplay.Text = "Range: 500m"
 RangeDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
 RangeDisplay.Font = Enum.Font.GothamBold
 RangeDisplay.TextSize = 10
@@ -94,10 +98,10 @@ Title.Name = "Title"
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0, 45)
 Title.BackgroundTransparency = 1
-Title.Text = "KILL AURA EXTREME"
+Title.Text = "KILL AURA EXTREME V2"
 Title.TextColor3 = Color3.fromRGB(255, 0, 0)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 15
+Title.TextSize = 14
 
 Credits.Parent = MainFrame
 Credits.Position = UDim2.new(0, 0, 1, -20)
@@ -135,22 +139,13 @@ createToggle("Atacar NPCs", UDim2.new(0, 10, 0, 95), true, function(s) _G.Attack
 createToggle("Atacar Players", UDim2.new(0, 10, 0, 140), false, function(s) _G.AttackPlayers = s end)
 
 -- Controle de Range Extreme
-local RangeTitle = Instance.new("TextLabel")
-RangeTitle.Parent = MainFrame
-RangeTitle.Position = UDim2.new(0, 10, 0, 185)
-RangeTitle.Size = UDim2.new(1, -20, 0, 20)
-RangeTitle.BackgroundTransparency = 1
-RangeTitle.Text = "AJUSTE DE RANGE (MAX 30K)"
-RangeTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
-RangeTitle.Font = Enum.Font.GothamBold
-RangeTitle.TextSize = 10
-
 local RangeInput = Instance.new("TextBox")
 RangeInput.Parent = MainFrame
-RangeInput.Position = UDim2.new(0, 10, 0, 210)
+RangeInput.Position = UDim2.new(0, 10, 0, 190)
 RangeInput.Size = UDim2.new(1, -20, 0, 30)
 RangeInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-RangeInput.Text = "100"
+RangeInput.Text = "500"
+RangeInput.PlaceholderText = "Range (Max 30000)"
 RangeInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 RangeInput.Font = Enum.Font.GothamBold
 RangeInput.TextSize = 12
@@ -159,51 +154,14 @@ Instance.new("UICorner", RangeInput).CornerRadius = UDim.new(0, 8)
 RangeInput.FocusLost:Connect(function()
     local val = tonumber(RangeInput.Text)
     if val then
-        if val > 30000 then val = 30000 end
-        if val < 1 then val = 1 end
-        _G.KillAuraRange = val
-        RangeInput.Text = tostring(val)
-        RangeDisplay.Text = "Range: " .. val .. "m"
-    else
+        _G.KillAuraRange = math.clamp(val, 1, 30000)
         RangeInput.Text = tostring(_G.KillAuraRange)
+        RangeDisplay.Text = "Range: " .. _G.KillAuraRange .. "m"
+        print("[REYZIM] Range alterado para: " .. _G.KillAuraRange)
     end
 end)
 
-local PlusBtn = Instance.new("TextButton")
-PlusBtn.Parent = MainFrame
-PlusBtn.Position = UDim2.new(0.5, 5, 0, 245)
-PlusBtn.Size = UDim2.new(0.5, -15, 0, 30)
-PlusBtn.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
-PlusBtn.Text = "+5000"
-PlusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-PlusBtn.Font = Enum.Font.GothamBold
-PlusBtn.TextSize = 10
-Instance.new("UICorner", PlusBtn).CornerRadius = UDim.new(0, 8)
-
-PlusBtn.MouseButton1Click:Connect(function()
-    _G.KillAuraRange = math.min(_G.KillAuraRange + 5000, 30000)
-    RangeInput.Text = tostring(_G.KillAuraRange)
-    RangeDisplay.Text = "Range: " .. _G.KillAuraRange .. "m"
-end)
-
-local MinusBtn = Instance.new("TextButton")
-MinusBtn.Parent = MainFrame
-MinusBtn.Position = UDim2.new(0, 10, 0, 245)
-MinusBtn.Size = UDim2.new(0.5, -15, 0, 30)
-MinusBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-MinusBtn.Text = "-5000"
-MinusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinusBtn.Font = Enum.Font.GothamBold
-MinusBtn.TextSize = 10
-Instance.new("UICorner", MinusBtn).CornerRadius = UDim.new(0, 8)
-
-MinusBtn.MouseButton1Click:Connect(function()
-    _G.KillAuraRange = math.max(_G.KillAuraRange - 5000, 100)
-    RangeInput.Text = tostring(_G.KillAuraRange)
-    RangeDisplay.Text = "Range: " .. _G.KillAuraRange .. "m"
-end)
-
--- [ LÓGICA DE ATAQUE EXTREME ]
+-- [ LÓGICA DE ATAQUE UNIVERSAL ]
 local function getTargets()
     local targets = {}
     local char = LocalPlayer.Character
@@ -211,42 +169,22 @@ local function getTargets()
     
     local myPos = char.HumanoidRootPart.Position
     
-    -- Otimização: Em vez de GetDescendants, vamos focar em Enemies e Players
-    if _G.AttackNPCs then
-        local enemies = workspace:FindFirstChild("Enemies")
-        if enemies then
-            for _, v in pairs(enemies:GetChildren()) do
-                if v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v.Humanoid.Health > 0 then
-                    local dist = (myPos - v.HumanoidRootPart.Position).Magnitude
-                    if dist <= _G.KillAuraRange then
-                        table.insert(targets, v)
-                    end
-                end
-            end
-        else
-            -- Fallback caso não exista a pasta Enemies
-            for _, v in pairs(workspace:GetChildren()) do
-                if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v.Name ~= LocalPlayer.Name then
-                    if not Players:GetPlayerFromCharacter(v) then
-                        local dist = (myPos - v.HumanoidRootPart.Position).Magnitude
-                        if dist <= _G.KillAuraRange and v.Humanoid.Health > 0 then
-                            table.insert(targets, v)
-                        end
+    -- Varredura Universal no Workspace
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Humanoid") and v.Parent and v.Parent:FindFirstChild("HumanoidRootPart") and v.Health > 0 then
+            local targetChar = v.Parent
+            if targetChar ~= char then
+                local dist = (myPos - targetChar.HumanoidRootPart.Position).Magnitude
+                if dist <= _G.KillAuraRange then
+                    local isPlayer = Players:GetPlayerFromCharacter(targetChar)
+                    if (isPlayer and _G.AttackPlayers) or (not isPlayer and _G.AttackNPCs) then
+                        table.insert(targets, targetChar)
                     end
                 end
             end
         end
-    end
-    
-    if _G.AttackPlayers then
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
-                local dist = (myPos - p.Character.HumanoidRootPart.Position).Magnitude
-                if dist <= _G.KillAuraRange and p.Character.Humanoid.Health > 0 then
-                    table.insert(targets, p.Character)
-                end
-            end
-        end
+        -- Limita a busca para não travar o mobile
+        if #targets > 20 then break end
     end
     
     return targets
@@ -257,11 +195,15 @@ task.spawn(function()
         task.wait(_G.AttackSpeed)
         if _G.KillAuraEnabled then
             local targets = getTargets()
-            for _, target in pairs(targets) do
-                if not _G.KillAuraEnabled then break end
-                pcall(function()
-                    AttackRemote:FireServer(0.5, 1)
-                end)
+            if #targets > 0 then
+                print("[REYZIM] Atacando " .. #targets .. " alvos...")
+                for _, target in pairs(targets) do
+                    if not _G.KillAuraEnabled then break end
+                    pcall(function()
+                        -- Dispara o Remote de Ataque
+                        AttackRemote:FireServer(0.5, 1)
+                    end)
+                end
             end
         end
     end
@@ -276,4 +218,4 @@ FloatingLogo.Changed:Connect(function()
     FloatingContainer.Position = FloatingLogo.Position
 end)
 
-print("Reyzim KillAura Extreme V1.0 - Carregado com Sucesso!")
+print("[REYZIM] Script V2 Carregado com Sucesso!")
