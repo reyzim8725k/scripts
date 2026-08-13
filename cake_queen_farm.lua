@@ -21,7 +21,7 @@ if CoreGui:FindFirstChild("ReyzimCakeFarm") then CoreGui.ReyzimCakeFarm:Destroy(
 local islandName = "Ice Cream Island"
 local bossName = "Cake Queen"
 local attackRemote = game:GetService("ReplicatedStorage").Modules.Net["RE/RegisterAttack"]
-local travelSpeed = 150 -- Velocidade de viagem (ajustável para não bugar)
+local travelSpeed = 150 
 
 -- [ CRIAÇÃO DA INTERFACE ]
 local ScreenGui = Instance.new("ScreenGui")
@@ -74,27 +74,45 @@ local function updateStatus(txt)
     print("[REYZIM] " .. txt)
 end
 
+-- Lógica de Server Hop Persistente
 local function serverHop()
-    updateStatus("Hop Server...")
-    task.wait(1)
-    local Servers = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-    local Server, Next = nil, nil
-    local function ListServers(cursor)
-        local success, raw = pcall(function() return game:HttpGet(Servers .. ((cursor and "&cursor=" .. cursor) or "")) end)
-        if success then return HttpService:JSONDecode(raw) end
+    updateStatus("Hop Persistente...")
+    
+    local function tryTeleport()
+        local Servers = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+        local function ListServers(cursor)
+            local success, raw = pcall(function() return game:HttpGet(Servers .. ((cursor and "&cursor=" .. cursor) or "")) end)
+            if success then return HttpService:JSONDecode(raw) end
+        end
+
+        local Next = nil
+        local data = ListServers(Next)
+        
+        if data and data.data then
+            -- Tenta vários servidores da lista para aumentar a chance
+            for i = 1, #data.data do
+                local s = data.data[i]
+                if s.playing < s.maxPlayers and s.id ~= game.JobId then
+                    updateStatus("Tentando Server...")
+                    local success, err = pcall(function()
+                        TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
+                    end)
+                    
+                    task.wait(3) -- Espera um pouco para ver se o teleporte inicia
+                    
+                    if not success then
+                        warn("Falha ao teleportar para " .. s.id .. ": " .. tostring(err))
+                    end
+                end
+            end
+        end
     end
 
-    repeat
-        local data = ListServers(Next)
-        if data and data.data then
-            Server = data.data[math.random(1, #data.data)]
-            Next = data.nextPageCursor
-        else
-            task.wait(2)
-        end
-    until Server and Server.playing < Server.maxPlayers and Server.id ~= game.JobId
-
-    TeleportService:TeleportToPlaceInstance(game.PlaceId, Server.id, LocalPlayer)
+    -- Loop infinito até o jogador sair do servidor
+    while task.wait(5) do
+        tryTeleport()
+        updateStatus("Retentando Hop...")
+    end
 end
 
 local function smoothMove(targetPos)
@@ -108,7 +126,6 @@ local function smoothMove(targetPos)
     local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
     local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos)})
     
-    -- Desativa gravidade temporariamente para não cair durante o voo
     local bv = Instance.new("BodyVelocity")
     bv.Velocity = Vector3.new(0,0,0)
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
@@ -125,12 +142,12 @@ local function startFarm()
     local island = workspace.Map:FindFirstChild(islandName)
     if not island then
         updateStatus("Ilha não encontrada!")
+        serverHop()
         return
     end
     
-    -- Pega a posição da ilha (tenta achar um ponto central ou parte)
     local islandPos = island:IsA("Model") and island:GetPivot().Position or island.Position
-    smoothMove(islandPos + Vector3.new(0, 50, 0)) -- Vai para cima da ilha
+    smoothMove(islandPos + Vector3.new(0, 50, 0))
     
     task.wait(2)
     
@@ -140,18 +157,12 @@ local function startFarm()
     if boss and boss:FindFirstChild("HumanoidRootPart") and boss:FindFirstChild("Humanoid") and boss.Humanoid.Health > 0 then
         updateStatus("Matando Queen!")
         
-        -- Loop de ataque
         while boss and boss.Parent and boss.Humanoid.Health > 0 do
             if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then break end
-            
-            -- Fica em cima da cabeça
             LocalPlayer.Character.HumanoidRootPart.CFrame = boss.HumanoidRootPart.CFrame * CFrame.new(0, 12, 0)
-            
-            -- Ataca
             pcall(function()
                 attackRemote:FireServer(0.5, 1)
             end)
-            
             task.wait(0.1)
         end
         
