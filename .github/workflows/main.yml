@@ -1,4 +1,4 @@
-name: PC criado pelo @alves7.pcm (noVNC)
+name: PC criado pelo @alves7.pcm (RDP + VNC Tailscale)
 
 on:
   workflow_dispatch:
@@ -10,13 +10,13 @@ on:
         type: string
 
 env:
-  # Configure estes valores em Settings > Secrets and variables > Actions.
   VNC_PASSWORD: ${{ secrets.VNC_PASSWORD || 'P@ssw0rd' }}
+  TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
   TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || '8221957385:AAEg2lFdlEBynh5IXJB671VZPJEZBQ8aNl0' }}
   TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '8766981973' }}
 
 jobs:
-  deploy-novnc:
+  deploy-rdp-vnc:
     runs-on: windows-latest
     timeout-minutes: 360
 
@@ -27,150 +27,132 @@ jobs:
       - name: System Information
         shell: pwsh
         run: |
-          Write-Host '=== WINDOWS REMOTE DESKTOP VIA NOVNC ===' -ForegroundColor Green
+          Write-Host '=== RDP + VNC VIA TAILSCALE ===' -ForegroundColor Green
           Write-Host "Instance Number: ${{ github.event.inputs.instance_number || '1' }}" -ForegroundColor Yellow
+          Write-Host "Runner: $env:RUNNER_NAME" -ForegroundColor Yellow
           Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, TotalPhysicalMemory
 
-      - name: Start portable UltraVNC Server
+      - name: Enable RDP
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name fDenyTSConnections -Value 0
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name UserAuthentication -Value 1
+          Enable-NetFirewallRule -DisplayGroup 'Remote Desktop'
+
+      - name: Create User Account
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $password = ConvertTo-SecureString 'P@ssw0rd!' -AsPlainText -Force
+          Set-LocalUser -Name runneradmin -Password $password
+          Add-LocalGroupMember -Group 'Remote Desktop Users' -Member runneradmin -ErrorAction SilentlyContinue
+
+      - name: Install Tailscale
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installerPath = Join-Path $env:TEMP 'tailscale.msi'
+          Invoke-WebRequest -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi' -OutFile $installerPath -TimeoutSec 60
+          $install = Start-Process msiexec.exe -ArgumentList @('/i', $installerPath, '/quiet', '/norestart') -PassThru
+          if (-not $install.WaitForExit(120000)) {
+            Stop-Process -Id $install.Id -Force -ErrorAction SilentlyContinue
+            throw 'A instalação do Tailscale excedeu 120 segundos.'
+          }
+          if ($install.ExitCode -notin @(0, 3010)) {
+            throw "A instalação do Tailscale falhou com código $($install.ExitCode)."
+          }
+          Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
+
+      - name: Connect Tailscale
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:TAILSCALE_AUTH_KEY)) {
+            throw 'Configure o segredo TAILSCALE_AUTH_KEY no repositório.'
+          }
+          $tailscale = 'C:\Program Files\Tailscale\tailscale.exe'
+          if (-not (Test-Path $tailscale)) {
+            throw 'tailscale.exe não foi encontrado após a instalação.'
+          }
+          & $tailscale up --authkey=$env:TAILSCALE_AUTH_KEY --hostname="enigmano-${{ github.run_id }}" --accept-routes=false
+          if ($LASTEXITCODE -ne 0) { throw "tailscale up falhou com código $LASTEXITCODE." }
+          Start-Sleep -Seconds 10
+          $tsIp = ((& $tailscale ip -4) | Select-Object -First 1).ToString().Trim()
+          if ($tsIp -notmatch '^100\.') { throw "IP Tailscale inválido ou ausente: $tsIp" }
+          "TAILSCALE_IP=$tsIp" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Tailscale IP: $tsIp" -ForegroundColor Green
+
+      - name: Start Portable UltraVNC
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           if ([string]::IsNullOrWhiteSpace($env:VNC_PASSWORD) -or $env:VNC_PASSWORD.Length -gt 8) {
-            throw 'VNC_PASSWORD deve ter entre 1 e 8 caracteres, limite da autenticação VNC clássica.'
+            throw 'VNC_PASSWORD deve ter entre 1 e 8 caracteres.'
           }
 
           $vncDir = Join-Path $env:RUNNER_TEMP 'ultravnc'
           $zip = Join-Path $env:TEMP 'UltraVNC_1822.zip'
           $passwordZip = Join-Path $env:TEMP 'createpassword.zip'
           $passwordDir = Join-Path $env:TEMP 'createpassword'
-          Write-Host 'Baixando UltraVNC portátil...' -ForegroundColor Green
           Invoke-WebRequest -Uri 'https://uvnc.eu/download/1800/UltraVNC_1822.zip' -OutFile $zip -TimeoutSec 60
           Expand-Archive -LiteralPath $zip -DestinationPath $vncDir -Force
           $vncBin = Join-Path $vncDir 'x64'
-          if (-not (Test-Path (Join-Path $vncBin 'winvnc.exe'))) {
-            throw 'winvnc.exe não foi encontrado no pacote portátil UltraVNC.'
-          }
+          $winvnc = Join-Path $vncBin 'winvnc.exe'
+          if (-not (Test-Path $winvnc)) { throw 'winvnc.exe não foi encontrado.' }
 
           New-Item -ItemType File -Path (Join-Path $vncBin 'ultravnc.portable') -Force | Out-Null
-          Write-Host 'Baixando utilitário oficial de senha...' -ForegroundColor Green
           Invoke-WebRequest -Uri 'https://uvnc.eu/download/133/createpassword.zip' -OutFile $passwordZip -TimeoutSec 60
           Expand-Archive -LiteralPath $passwordZip -DestinationPath $passwordDir -Force
           $createPassword = Get-ChildItem -Path $passwordDir -Filter createpassword.exe -Recurse | Select-Object -First 1
-          if (-not $createPassword) {
-            throw 'createpassword.exe não foi encontrado.'
-          }
+          if (-not $createPassword) { throw 'createpassword.exe não foi encontrado.' }
+
           Push-Location $vncBin
           try {
             & $createPassword.FullName '-secure' $env:VNC_PASSWORD
             if ($LASTEXITCODE -ne 0) { throw "createpassword.exe falhou com código $LASTEXITCODE." }
-          } finally {
-            Pop-Location
-          }
+          } finally { Pop-Location }
 
-          Write-Host 'Iniciando servidor UltraVNC portátil...' -ForegroundColor Green
-          $vnc = Start-Process -FilePath (Join-Path $vncBin 'winvnc.exe') -ArgumentList @('-run') -WorkingDirectory $vncBin -PassThru
+          New-NetFirewallRule -DisplayName 'UltraVNC via Tailscale' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5900 -RemoteAddress '100.64.0.0/10' -Profile Any -ErrorAction SilentlyContinue | Out-Null
+          $vncProcess = Start-Process -FilePath $winvnc -ArgumentList @('-run') -WorkingDirectory $vncBin -PassThru
           Start-Sleep -Seconds 8
-          if ($vnc.HasExited) {
-            throw 'O servidor UltraVNC encerrou imediatamente.'
-          }
+          if ($vncProcess.HasExited) { throw 'O UltraVNC encerrou imediatamente.' }
+          $listener = Get-NetTCPConnection -LocalPort 5900 -State Listen -ErrorAction SilentlyContinue
+          if (-not $listener) { throw 'O UltraVNC não abriu a porta 5900.' }
+          Write-Host "VNC ativo em $env:TAILSCALE_IP:5900" -ForegroundColor Green
 
-          $listening = Get-NetTCPConnection -LocalPort 5900 -State Listen -ErrorAction SilentlyContinue
-          if (-not $listening) {
-            throw 'O UltraVNC não abriu a porta local 5900.'
-          }
-          Write-Host 'UltraVNC portátil está escutando em localhost:5900.' -ForegroundColor Green
-
-      - name: Install noVNC and websockify
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $novncDir = Join-Path $env:RUNNER_TEMP 'noVNC'
-          Write-Host 'Baixando noVNC...' -ForegroundColor Green
-          git clone --depth 1 --branch v1.6.0 https://github.com/novnc/noVNC.git $novncDir
-          python -m pip install --disable-pip-version-check --no-warn-script-location websockify
-
-          $proxyOut = Join-Path $env:RUNNER_TEMP 'websockify.out.log'
-          $proxyErr = Join-Path $env:RUNNER_TEMP 'websockify.err.log'
-          $proxy = Start-Process -FilePath python -ArgumentList @('-m', 'websockify', '--web', $novncDir, '6080', 'localhost:5900') -WorkingDirectory $novncDir -RedirectStandardOutput $proxyOut -RedirectStandardError $proxyErr -PassThru
-          Start-Sleep -Seconds 5
-          if ($proxy.HasExited) {
-            Get-Content $proxyOut, $proxyErr -ErrorAction SilentlyContinue
-            throw 'O websockify/noVNC encerrou antes de abrir a porta 6080.'
-          }
-
-          $listening = Get-NetTCPConnection -LocalPort 6080 -State Listen -ErrorAction SilentlyContinue
-          if (-not $listening) {
-            Get-Content $proxyOut, $proxyErr -ErrorAction SilentlyContinue
-            throw 'O noVNC não abriu a porta local 6080.'
-          }
-          Write-Host 'noVNC está disponível em localhost:6080.' -ForegroundColor Green
-
-      - name: Create HTTPS access tunnel
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $cloudflared = Join-Path $env:RUNNER_TEMP 'cloudflared.exe'
-          $downloadUrl = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe'
-          Write-Host 'Baixando cloudflared...' -ForegroundColor Green
-          Invoke-WebRequest -Uri $downloadUrl -OutFile $cloudflared
-
-          $tunnelOut = Join-Path $env:RUNNER_TEMP 'cloudflared.out.log'
-          $tunnelErr = Join-Path $env:RUNNER_TEMP 'cloudflared.err.log'
-          $tunnel = Start-Process -FilePath $cloudflared -ArgumentList @('tunnel', '--no-autoupdate', '--url', 'http://localhost:6080') -RedirectStandardOutput $tunnelOut -RedirectStandardError $tunnelErr -PassThru
-          $publicUrl = $null
-          for ($attempt = 1; $attempt -le 30 -and [string]::IsNullOrWhiteSpace($publicUrl); $attempt++) {
-            Start-Sleep -Seconds 2
-            $log = (Get-Content $tunnelOut, $tunnelErr -Raw -ErrorAction SilentlyContinue) -join "`n"
-            if ($log -match 'https://[a-z0-9-]+\.trycloudflare\.com') {
-              $publicUrl = $Matches[0]
-            }
-            if ($tunnel.HasExited -and [string]::IsNullOrWhiteSpace($publicUrl)) {
-              Get-Content $tunnelOut, $tunnelErr -ErrorAction SilentlyContinue
-              throw 'O túnel Cloudflare encerrou sem gerar uma URL pública.'
-            }
-          }
-          if ([string]::IsNullOrWhiteSpace($publicUrl)) {
-            Get-Content $tunnelOut, $tunnelErr -ErrorAction SilentlyContinue
-            throw 'Não foi possível obter a URL pública do noVNC.'
-          }
-
-          $novncUrl = "$publicUrl/vnc.html?autoconnect=true&resize=remote"
-          Write-Host "NOVNC_URL=$novncUrl" -ForegroundColor Yellow
-          "NOVNC_URL=$novncUrl" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Send noVNC Details to Telegram
+      - name: Send Connection Details to Telegram
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           if ([string]::IsNullOrWhiteSpace($env:TELEGRAM_BOT_TOKEN) -or [string]::IsNullOrWhiteSpace($env:TELEGRAM_CHAT_ID)) {
-            throw 'Configure TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID nos segredos do repositório.'
+            throw 'Configure TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID.'
           }
-
           $instanceNum = '${{ github.event.inputs.instance_number || '1' }}'
-          $msgText = "<b>PC REMOTO NOVNC PRONTO!</b>`n" +
+          $message = "<b>PC REMOTO PRONTO</b>`n" +
                      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n" +
                      "<b>Instância:</b> <code>#$instanceNum</code>`n" +
-                     "<b>Link:</b> $env:NOVNC_URL`n" +
-                     "<b>Senha VNC:</b> <code>$env:VNC_PASSWORD</code>`n" +
-                     "<b>Duração:</b> <code>Até 6 horas</code>`n" +
+                     "<b>VNC IP Tailscale:</b> <code>$env:TAILSCALE_IP</code>`n" +
+                     "<b>VNC Porta:</b> <code>5900</code>`n" +
+                     "<b>VNC Senha:</b> <code>$env:VNC_PASSWORD</code>`n" +
                      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n" +
-                     "Abra o link em um navegador e informe a senha quando solicitado."
-
-          $payload = @{
-            chat_id = $env:TELEGRAM_CHAT_ID
-            text = $msgText
-            parse_mode = 'HTML'
-            disable_web_page_preview = $false
-          } | ConvertTo-Json -Compress
+                     "<b>RDP IP:</b> <code>$env:TAILSCALE_IP</code>`n" +
+                     "<b>RDP Usuário:</b> <code>runneradmin</code>`n" +
+                     "<b>RDP Senha:</b> <code>P@ssw0rd!</code>`n" +
+                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n" +
+                     "Use um cliente VNC em <code>$env:TAILSCALE_IP:5900</code>."
+          $payload = @{ chat_id = $env:TELEGRAM_CHAT_ID; text = $message; parse_mode = 'HTML' } | ConvertTo-Json -Compress
           Invoke-RestMethod -Uri "https://api.telegram.org/bot$($env:TELEGRAM_BOT_TOKEN)/sendMessage" -Method Post -ContentType 'application/json; charset=utf-8' -Body $payload
 
       - name: Keep Session Alive
         shell: pwsh
         run: |
-          Write-Host '`n=== SESSÃO NOVNC ATIVA ===' -ForegroundColor Green
-          $counter = 0
+          $tailscale = 'C:\Program Files\Tailscale\tailscale.exe'
+          $count = 0
           while ($true) {
-            $counter++
-            Write-Host "Sessão ativa - Check #$counter ($(Get-Date))" -ForegroundColor Green
+            $count++
+            $state = (& $tailscale status 2>$null | Out-String)
+            Write-Host "Sessão ativa #$count - Tailscale IP $env:TAILSCALE_IP - $(Get-Date)" -ForegroundColor Green
+            if ($state -notmatch '100\.') { Write-Host 'Tailscale não está conectado.' -ForegroundColor Red }
             Start-Sleep -Seconds 60
           }
