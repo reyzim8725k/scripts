@@ -85,7 +85,7 @@ jobs:
                    "🔑 <b>Senha:</b> <code>P@ssw0rd!</code>`n" +
                    "⏱️ <b>Duração:</b> <code>Até 6 horas</code>`n" +
                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n" +
-                   "📌 <i>Abra o AnyDesk, insira o ID acima e aceda com a senha fornecida.</i>"
+                   "📌 <i>Abra o AnyDesk, digite o ID acima e acesse com a senha fornecida.</i>"
 
         $payload = @{
             chat_id = $chatId
