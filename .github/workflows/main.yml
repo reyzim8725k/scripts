@@ -31,59 +31,54 @@ jobs:
           Write-Host "Instance Number: ${{ github.event.inputs.instance_number || '1' }}" -ForegroundColor Yellow
           Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, TotalPhysicalMemory
 
-      - name: Install TightVNC Server
+      - name: Start portable UltraVNC Server
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           if ([string]::IsNullOrWhiteSpace($env:VNC_PASSWORD) -or $env:VNC_PASSWORD.Length -gt 8) {
-            throw 'VNC_PASSWORD deve ter entre 1 e 8 caracteres, limite do TightVNC.'
+            throw 'VNC_PASSWORD deve ter entre 1 e 8 caracteres, limite da autenticação VNC clássica.'
           }
 
-          $msi = Join-Path $env:TEMP 'tightvnc.msi'
-          $url = 'https://www.tightvnc.com/download/2.8.88/tightvnc-2.8.88-gpl-setup-64bit.msi'
-          Write-Host 'Baixando TightVNC...' -ForegroundColor Green
-          Invoke-WebRequest -Uri $url -OutFile $msi -TimeoutSec 60
-          if (-not (Test-Path $msi) -or (Get-Item $msi).Length -lt 1000000) {
-            throw 'O instalador TightVNC não foi baixado corretamente.'
+          $vncDir = Join-Path $env:RUNNER_TEMP 'ultravnc'
+          $zip = Join-Path $env:TEMP 'UltraVNC_1822.zip'
+          $passwordZip = Join-Path $env:TEMP 'createpassword.zip'
+          $passwordDir = Join-Path $env:TEMP 'createpassword'
+          Write-Host 'Baixando UltraVNC portátil...' -ForegroundColor Green
+          Invoke-WebRequest -Uri 'https://uvnc.eu/download/1800/UltraVNC_1822.zip' -OutFile $zip -TimeoutSec 60
+          Expand-Archive -LiteralPath $zip -DestinationPath $vncDir -Force
+          $vncBin = Join-Path $vncDir 'x64'
+          if (-not (Test-Path (Join-Path $vncBin 'winvnc.exe'))) {
+            throw 'winvnc.exe não foi encontrado no pacote portátil UltraVNC.'
           }
 
-          Write-Host 'Instalando TightVNC com autenticação...' -ForegroundColor Green
-          $args = @(
-            '/i', $msi, '/qn', '/norestart',
-            'SET_USEVNCAUTHENTICATION=1',
-            'SET_PASSWORD=1',
-            'VALUE_OF_PASSWORD=' + $env:VNC_PASSWORD,
-            'SET_VIEWONLYPASSWORD=0',
-            'SET_ALLOWLOOPBACK=1',
-            'SET_ALLOWBLANKPASSWORD=0'
-          )
-          $msiLog = Join-Path $env:RUNNER_TEMP 'tightvnc-msi.log'
-          $args += @('/l*v', $msiLog)
-          $args = @('/i', $msi, '/quiet', '/norestart') + $args[4..($args.Count - 1)]
-          $install = Start-Process -FilePath msiexec.exe -ArgumentList $args -PassThru
-          if (-not $install.WaitForExit(120000)) {
-            Stop-Process -Id $install.Id -Force -ErrorAction SilentlyContinue
-            Get-Content $msiLog -Tail 80 -ErrorAction SilentlyContinue
-            throw 'O instalador TightVNC excedeu o limite de 120 segundos.'
+          New-Item -ItemType File -Path (Join-Path $vncBin 'ultravnc.portable') -Force | Out-Null
+          Write-Host 'Baixando utilitário oficial de senha...' -ForegroundColor Green
+          Invoke-WebRequest -Uri 'https://uvnc.eu/download/133/createpassword.zip' -OutFile $passwordZip -TimeoutSec 60
+          Expand-Archive -LiteralPath $passwordZip -DestinationPath $passwordDir -Force
+          $createPassword = Get-ChildItem -Path $passwordDir -Filter createpassword.exe -Recurse | Select-Object -First 1
+          if (-not $createPassword) {
+            throw 'createpassword.exe não foi encontrado.'
           }
-          if ($install.ExitCode -notin @(0, 3010)) {
-            Get-Content $msiLog -Tail 80 -ErrorAction SilentlyContinue
-            throw "A instalação do TightVNC falhou com código $($install.ExitCode)."
+          Push-Location $vncBin
+          try {
+            & $createPassword.FullName '-secure' $env:VNC_PASSWORD
+            if ($LASTEXITCODE -ne 0) { throw "createpassword.exe falhou com código $LASTEXITCODE." }
+          } finally {
+            Pop-Location
           }
 
-          $service = Get-Service -Name tvnserver -ErrorAction SilentlyContinue
-          if (-not $service) {
-            throw 'O serviço tvnserver não foi criado pelo instalador.'
+          Write-Host 'Iniciando servidor UltraVNC portátil...' -ForegroundColor Green
+          $vnc = Start-Process -FilePath (Join-Path $vncBin 'winvnc.exe') -ArgumentList @('-run') -WorkingDirectory $vncBin -PassThru
+          Start-Sleep -Seconds 8
+          if ($vnc.HasExited) {
+            throw 'O servidor UltraVNC encerrou imediatamente.'
           }
-          Set-Service -Name tvnserver -StartupType Manual
-          Start-Service -Name tvnserver -ErrorAction SilentlyContinue
-          Start-Sleep -Seconds 5
 
           $listening = Get-NetTCPConnection -LocalPort 5900 -State Listen -ErrorAction SilentlyContinue
           if (-not $listening) {
-            throw 'O TightVNC não abriu a porta local 5900.'
+            throw 'O UltraVNC não abriu a porta local 5900.'
           }
-          Write-Host 'TightVNC está escutando em localhost:5900.' -ForegroundColor Green
+          Write-Host 'UltraVNC portátil está escutando em localhost:5900.' -ForegroundColor Green
 
       - name: Install noVNC and websockify
         shell: pwsh
