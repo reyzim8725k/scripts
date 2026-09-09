@@ -42,7 +42,10 @@ jobs:
           $msi = Join-Path $env:TEMP 'tightvnc.msi'
           $url = 'https://www.tightvnc.com/download/2.8.88/tightvnc-2.8.88-gpl-setup-64bit.msi'
           Write-Host 'Baixando TightVNC...' -ForegroundColor Green
-          Invoke-WebRequest -Uri $url -OutFile $msi
+          Invoke-WebRequest -Uri $url -OutFile $msi -TimeoutSec 60
+          if (-not (Test-Path $msi) -or (Get-Item $msi).Length -lt 1000000) {
+            throw 'O instalador TightVNC não foi baixado corretamente.'
+          }
 
           Write-Host 'Instalando TightVNC com autenticação...' -ForegroundColor Green
           $args = @(
@@ -55,8 +58,16 @@ jobs:
             'SET_ALLOWBLANKPASSWORD=0',
             'SET_RUNCONTROLINTERFACE=1'
           )
-          $install = Start-Process -FilePath msiexec.exe -ArgumentList $args -Wait -PassThru
+          $msiLog = Join-Path $env:RUNNER_TEMP 'tightvnc-msi.log'
+          $args += @('/l*v', $msiLog)
+          $install = Start-Process -FilePath msiexec.exe -ArgumentList $args -PassThru
+          if (-not $install.WaitForExit(120000)) {
+            Stop-Process -Id $install.Id -Force -ErrorAction SilentlyContinue
+            Get-Content $msiLog -Tail 80 -ErrorAction SilentlyContinue
+            throw 'O instalador TightVNC excedeu o limite de 120 segundos.'
+          }
           if ($install.ExitCode -notin @(0, 3010)) {
+            Get-Content $msiLog -Tail 80 -ErrorAction SilentlyContinue
             throw "A instalação do TightVNC falhou com código $($install.ExitCode)."
           }
 
