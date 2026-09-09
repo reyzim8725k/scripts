@@ -1,4 +1,4 @@
-name: PC criado pelo @alves7.pcm (AnyDesk)
+name: PC criado pelo @alves7.pcm (noVNC)
 
 on:
   workflow_dispatch:
@@ -10,13 +10,13 @@ on:
         type: string
 
 env:
-  # Os segredos têm prioridade; os fallbacks preservam a compatibilidade com a configuração atual.
-  ANYDESK_PASSWORD: ${{ secrets.ANYDESK_PASSWORD || 'P@ssw0rd!' }}
+  # Configure estes valores em Settings > Secrets and variables > Actions.
+  VNC_PASSWORD: ${{ secrets.VNC_PASSWORD || 'P@ssw0rd' }}
   TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || '8221957385:AAEg2lFdlEBynh5IXJB671VZPJEZBQ8aNl0' }}
   TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '8766981973' }}
 
 jobs:
-  deploy-anydesk:
+  deploy-novnc:
     runs-on: windows-latest
     timeout-minutes: 360
 
@@ -27,137 +27,141 @@ jobs:
       - name: System Information
         shell: pwsh
         run: |
-          Write-Host "=== ENIGMANO ANYDESK DEPLOYMENT ===" -ForegroundColor Green
+          Write-Host '=== WINDOWS REMOTE DESKTOP VIA NOVNC ===' -ForegroundColor Green
           Write-Host "Instance Number: ${{ github.event.inputs.instance_number || '1' }}" -ForegroundColor Yellow
-          Write-Host "Runner: $env:RUNNER_NAME" -ForegroundColor Yellow
           Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, TotalPhysicalMemory
-          Get-CimInstance -ClassName Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors
 
-      - name: Install and Configure AnyDesk
+      - name: Install TightVNC Server
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $anydeskUrl = 'https://download.anydesk.com/AnyDesk.exe'
-          $installerPath = Join-Path $env:TEMP 'AnyDesk.exe'
-          $installDir = Join-Path ${env:ProgramFiles(x86)} 'AnyDesk'
-          $fallbackDir = Join-Path $env:ProgramFiles 'AnyDesk'
-
-          if ([string]::IsNullOrWhiteSpace($env:ANYDESK_PASSWORD)) {
-            throw 'O segredo ANYDESK_PASSWORD não está configurado no repositório.'
+          if ([string]::IsNullOrWhiteSpace($env:VNC_PASSWORD) -or $env:VNC_PASSWORD.Length -gt 8) {
+            throw 'VNC_PASSWORD deve ter entre 1 e 8 caracteres, limite do TightVNC.'
           }
 
-          Write-Host 'Baixando o AnyDesk...' -ForegroundColor Green
-          Invoke-WebRequest -Uri $anydeskUrl -OutFile $installerPath
-          Write-Host 'Instalando o AnyDesk silenciosamente...' -ForegroundColor Green
-          $install = Start-Process -FilePath $installerPath -ArgumentList @('--install', $installDir, '--start-with-win', '--silent') -Wait -PassThru
-          if ($install.ExitCode -ne 0) {
-            throw "A instalação do AnyDesk terminou com código $($install.ExitCode)."
-          }
+          $msi = Join-Path $env:TEMP 'tightvnc.msi'
+          $url = 'https://www.tightvnc.com/download/2.8.88/tightvnc-2.8.88-gpl-setup-64bit.msi'
+          Write-Host 'Baixando TightVNC...' -ForegroundColor Green
+          Invoke-WebRequest -Uri $url -OutFile $msi
 
-          $anydeskCmd = $null
-          $candidatePaths = @(
-            (Join-Path $installDir 'AnyDesk.exe'),
-            (Join-Path $fallbackDir 'AnyDesk.exe'),
-            (Join-Path $env:ProgramData 'AnyDesk\AnyDesk.exe'),
-            (Join-Path $env:ProgramData 'AnyDesk.exe')
+          Write-Host 'Instalando TightVNC com autenticação...' -ForegroundColor Green
+          $args = @(
+            '/i', $msi, '/qn', '/norestart',
+            'SET_USEVNCAUTHENTICATION=1',
+            'SET_PASSWORD=1',
+            'VALUE_OF_PASSWORD=' + $env:VNC_PASSWORD,
+            'SET_VIEWONLYPASSWORD=0',
+            'SET_ALLOWLOOPBACK=1',
+            'SET_ALLOWBLANKPASSWORD=0',
+            'SET_RUNCONTROLINTERFACE=1'
           )
-
-          for ($attempt = 1; $attempt -le 30 -and -not $anydeskCmd; $attempt++) {
-            foreach ($candidate in $candidatePaths) {
-              if (Test-Path -LiteralPath $candidate -PathType Leaf) {
-                $anydeskCmd = $candidate
-                break
-              }
-            }
-            if (-not $anydeskCmd) {
-              Write-Host "Aguardando o executável do AnyDesk (tentativa $attempt/30)..."
-              Start-Sleep -Seconds 2
-            }
+          $install = Start-Process -FilePath msiexec.exe -ArgumentList $args -Wait -PassThru
+          if ($install.ExitCode -notin @(0, 3010)) {
+            throw "A instalação do TightVNC falhou com código $($install.ExitCode)."
           }
-          if (-not $anydeskCmd) {
-            throw 'O executável do AnyDesk não foi encontrado após a instalação.'
-          }
-          Write-Host "Executável encontrado em: $anydeskCmd" -ForegroundColor Cyan
 
-          Start-Service -Name AnyDesk -ErrorAction SilentlyContinue
+          $service = Get-Service -Name tvnserver -ErrorAction SilentlyContinue
+          if (-not $service) {
+            throw 'O serviço tvnserver não foi criado pelo instalador.'
+          }
+          Set-Service -Name tvnserver -StartupType Manual
+          Start-Service -Name tvnserver -ErrorAction SilentlyContinue
           Start-Sleep -Seconds 5
 
-          Write-Host 'Configurando senha de acesso não supervisionado...' -ForegroundColor Green
-          $passwordResult = $env:ANYDESK_PASSWORD | & $anydeskCmd --set-password 2>&1
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host ($passwordResult | Out-String)
-            throw "O AnyDesk não aceitou a configuração da senha (código $LASTEXITCODE)."
+          $listening = Get-NetTCPConnection -LocalPort 5900 -State Listen -ErrorAction SilentlyContinue
+          if (-not $listening) {
+            throw 'O TightVNC não abriu a porta local 5900.'
+          }
+          Write-Host 'TightVNC está escutando em localhost:5900.' -ForegroundColor Green
+
+      - name: Install noVNC and websockify
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $novncDir = Join-Path $env:RUNNER_TEMP 'noVNC'
+          Write-Host 'Baixando noVNC...' -ForegroundColor Green
+          git clone --depth 1 --branch v1.6.0 https://github.com/novnc/noVNC.git $novncDir
+          python -m pip install --disable-pip-version-check --no-warn-script-location websockify
+
+          $proxyOut = Join-Path $env:RUNNER_TEMP 'websockify.out.log'
+          $proxyErr = Join-Path $env:RUNNER_TEMP 'websockify.err.log'
+          $proxy = Start-Process -FilePath python -ArgumentList @('-m', 'websockify', '--web', $novncDir, '6080', 'localhost:5900') -WorkingDirectory $novncDir -RedirectStandardOutput $proxyOut -RedirectStandardError $proxyErr -PassThru
+          Start-Sleep -Seconds 5
+          if ($proxy.HasExited) {
+            Get-Content $proxyOut, $proxyErr -ErrorAction SilentlyContinue
+            throw 'O websockify/noVNC encerrou antes de abrir a porta 6080.'
           }
 
-          Write-Host 'Obtendo AnyDesk ID...' -ForegroundColor Green
-          $anydeskId = $null
-          $configPaths = @(
-            (Join-Path $env:ProgramData 'AnyDesk\system.conf'),
-            (Join-Path $env:APPDATA 'AnyDesk\system.conf')
-          )
+          $listening = Get-NetTCPConnection -LocalPort 6080 -State Listen -ErrorAction SilentlyContinue
+          if (-not $listening) {
+            Get-Content $proxyOut, $proxyErr -ErrorAction SilentlyContinue
+            throw 'O noVNC não abriu a porta local 6080.'
+          }
+          Write-Host 'noVNC está disponível em localhost:6080.' -ForegroundColor Green
 
-          for ($attempt = 1; $attempt -le 30 -and [string]::IsNullOrWhiteSpace($anydeskId); $attempt++) {
-            foreach ($configPath in $configPaths) {
-              if (Test-Path -LiteralPath $configPath -PathType Leaf) {
-                $line = Get-Content -LiteralPath $configPath -ErrorAction SilentlyContinue |
-                  Where-Object { $_ -match '^ad\.anydesk\.id=' } |
-                  Select-Object -First 1
-                if ($line -and $line -match '^ad\.anydesk\.id=(.+)$') {
-                  $anydeskId = $Matches[1].Trim()
-                  break
-                }
-              }
+      - name: Create HTTPS access tunnel
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cloudflared = Join-Path $env:RUNNER_TEMP 'cloudflared.exe'
+          $downloadUrl = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe'
+          Write-Host 'Baixando cloudflared...' -ForegroundColor Green
+          Invoke-WebRequest -Uri $downloadUrl -OutFile $cloudflared
+
+          $tunnelOut = Join-Path $env:RUNNER_TEMP 'cloudflared.out.log'
+          $tunnelErr = Join-Path $env:RUNNER_TEMP 'cloudflared.err.log'
+          $tunnel = Start-Process -FilePath $cloudflared -ArgumentList @('tunnel', '--no-autoupdate', '--url', 'http://localhost:6080') -RedirectStandardOutput $tunnelOut -RedirectStandardError $tunnelErr -PassThru
+          $publicUrl = $null
+          for ($attempt = 1; $attempt -le 30 -and [string]::IsNullOrWhiteSpace($publicUrl); $attempt++) {
+            Start-Sleep -Seconds 2
+            $log = (Get-Content $tunnelOut, $tunnelErr -Raw -ErrorAction SilentlyContinue) -join "`n"
+            if ($log -match 'https://[a-z0-9-]+\.trycloudflare\.com') {
+              $publicUrl = $Matches[0]
             }
-
-            if ([string]::IsNullOrWhiteSpace($anydeskId)) {
-              $rawId = @(& $anydeskCmd --get-id 2>$null) -join "`n"
-              if ($rawId -match '\b\d{6,}\b') {
-                $anydeskId = $Matches[0]
-              }
-            }
-
-            if ([string]::IsNullOrWhiteSpace($anydeskId)) {
-              Write-Host "ID ainda não disponível (tentativa $attempt/30)..."
-              Start-Sleep -Seconds 2
+            if ($tunnel.HasExited -and [string]::IsNullOrWhiteSpace($publicUrl)) {
+              Get-Content $tunnelOut, $tunnelErr -ErrorAction SilentlyContinue
+              throw 'O túnel Cloudflare encerrou sem gerar uma URL pública.'
             }
           }
-
-          if ([string]::IsNullOrWhiteSpace($anydeskId)) {
-            throw 'O AnyDesk foi instalado, mas não forneceu um ID após 60 segundos.'
+          if ([string]::IsNullOrWhiteSpace($publicUrl)) {
+            Get-Content $tunnelOut, $tunnelErr -ErrorAction SilentlyContinue
+            throw 'Não foi possível obter a URL pública do noVNC.'
           }
 
-          Write-Host "AnyDesk ID obtido: $anydeskId" -ForegroundColor Yellow
-          "ANYDESK_ID=$anydeskId" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $novncUrl = "$publicUrl/vnc.html?autoconnect=true&resize=remote"
+          Write-Host "NOVNC_URL=$novncUrl" -ForegroundColor Yellow
+          "NOVNC_URL=$novncUrl" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Send AnyDesk Details to Telegram
+      - name: Send noVNC Details to Telegram
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           if ([string]::IsNullOrWhiteSpace($env:TELEGRAM_BOT_TOKEN) -or [string]::IsNullOrWhiteSpace($env:TELEGRAM_CHAT_ID)) {
-            throw 'Configure os segredos TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID no repositório.'
+            throw 'Configure TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID nos segredos do repositório.'
           }
 
           $instanceNum = '${{ github.event.inputs.instance_number || '1' }}'
-          $msgText = "<b>MÁQUINA ANYDESK PRONTA!</b>`n" +
+          $msgText = "<b>PC REMOTO NOVNC PRONTO!</b>`n" +
                      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n" +
                      "<b>Instância:</b> <code>#$instanceNum</code>`n" +
-                     "<b>AnyDesk ID:</b> <code>$env:ANYDESK_ID</code>`n" +
-                     "<b>Senha:</b> <code>$env:ANYDESK_PASSWORD</code>`n" +
+                     "<b>Link:</b> $env:NOVNC_URL`n" +
+                     "<b>Senha VNC:</b> <code>$env:VNC_PASSWORD</code>`n" +
                      "<b>Duração:</b> <code>Até 6 horas</code>`n" +
-                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n" +
+                     "Abra o link em um navegador e informe a senha quando solicitado."
 
           $payload = @{
             chat_id = $env:TELEGRAM_CHAT_ID
             text = $msgText
             parse_mode = 'HTML'
+            disable_web_page_preview = $false
           } | ConvertTo-Json -Compress
-
           Invoke-RestMethod -Uri "https://api.telegram.org/bot$($env:TELEGRAM_BOT_TOKEN)/sendMessage" -Method Post -ContentType 'application/json; charset=utf-8' -Body $payload
 
       - name: Keep Session Alive
         shell: pwsh
         run: |
-          Write-Host "`n=== SESSÃO ANYDESK ATIVA ===" -ForegroundColor Green
+          Write-Host '`n=== SESSÃO NOVNC ATIVA ===' -ForegroundColor Green
           $counter = 0
           while ($true) {
             $counter++
