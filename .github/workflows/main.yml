@@ -55,11 +55,11 @@ jobs:
             'VALUE_OF_PASSWORD=' + $env:VNC_PASSWORD,
             'SET_VIEWONLYPASSWORD=0',
             'SET_ALLOWLOOPBACK=1',
-            'SET_ALLOWBLANKPASSWORD=0',
-            'SET_RUNCONTROLINTERFACE=1'
+            'SET_ALLOWBLANKPASSWORD=0'
           )
           $msiLog = Join-Path $env:RUNNER_TEMP 'tightvnc-msi.log'
           $args += @('/l*v', $msiLog)
+          $args = @('/i', $msi, '/quiet', '/norestart') + $args[4..($args.Count - 1)]
           $install = Start-Process -FilePath msiexec.exe -ArgumentList $args -PassThru
           if (-not $install.WaitForExit(120000)) {
             Stop-Process -Id $install.Id -Force -ErrorAction SilentlyContinue
