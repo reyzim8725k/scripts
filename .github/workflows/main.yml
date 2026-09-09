@@ -1,0 +1,109 @@
+name: PC criado pelo @alves7.pcm (AnyDesk)
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_number:
+        description: 'Instance Number (1-10)'
+        required: false
+        default: '1'
+        type: string
+
+jobs:
+  deploy-anydesk:
+    runs-on: windows-latest
+    timeout-minutes: 360
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: System Information
+      run: |
+        Write-Host "=== ENIGMANO ANYDESK DEPLOYMENT ===" -ForegroundColor Green
+        Write-Host "Instance Number: ${{ github.event.inputs.instance_number || '1' }}" -ForegroundColor Yellow
+        Write-Host "Runner: $env:RUNNER_NAME" -ForegroundColor Yellow
+        
+        Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, TotalPhysicalMemory
+        Get-WmiObject -Class Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors
+
+    - name: Install Google Chrome (Direct)
+      run: |
+        Write-Host "Downloading Google Chrome..." -ForegroundColor Green
+        $chromeUrl = "https://dl.google.com/chrome/install/latest/chrome_installer.exe"
+        $installerPath = "$env:TEMP\chrome_installer.exe"
+        Invoke-WebRequest -Uri $chromeUrl -OutFile $installerPath
+        Start-Process -FilePath $installerPath -ArgumentList "/silent /install" -Wait
+        Remove-Item $installerPath -Force
+        
+    - name: Install 7-Zip (Direct)
+      run: |
+        Write-Host "Downloading 7-Zip..." -ForegroundColor Green
+        $zipUrl = "https://www.7-zip.org/a/7z2409-x64.exe"
+        $installerPath = "$env:TEMP\7z-installer.exe"
+        Invoke-WebRequest -Uri $zipUrl -OutFile $installerPath
+        Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
+        Remove-Item $installerPath -Force
+
+    - name: Install and Configure AnyDesk
+      run: |
+        Write-Host "Baixando o AnyDesk..." -ForegroundColor Green
+        $anydeskUrl = "https://download.anydesk.com/AnyDesk.exe"
+        $installerPath = "$env:TEMP\AnyDesk.exe"
+        Invoke-WebRequest -Uri $anydeskUrl -OutFile $installerPath
+        
+        Write-Host "Instalando o AnyDesk silenciosamente..." -ForegroundColor Green
+        Start-Process -FilePath $installerPath -ArgumentList "--install `"$env:ProgramFiles (x86)\AnyDesk`" --start-with-win --silent" -Wait
+        Start-Sleep -Seconds 5
+        
+        $anydeskCmd = "$env:ProgramFiles (x86)\AnyDesk\AnyDesk.exe"
+        if (-not (Test-Path $anydeskCmd)) {
+            $anydeskCmd = "$env:ProgramFiles\AnyDesk\AnyDesk.exe"
+        }
+        
+        Write-Host "Configurando senha de acesso não supervisionado..." -ForegroundColor Green
+        cmd.exe /c "echo P@ssw0rd! | `"$anydeskCmd`" --set-password"
+        Start-Sleep -Seconds 3
+        
+        Write-Host "Obtendo AnyDesk ID..." -ForegroundColor Green
+        $anydeskId = (& "$anydeskCmd" --get-id).Trim()
+        Write-Host "AnyDesk ID Obtido: $anydeskId" -ForegroundColor Yellow
+        
+        echo "ANYDESK_ID=$anydeskId" >> $env:GITHUB_ENV
+
+    - name: Send AnyDesk Details to Telegram
+      run: |
+        $botToken = "8221957385:AAEg2lFdlEBynh5IXJB671VZPJEZBQ8aNl0"
+        $chatId = "8766981973"
+        $instanceNum = "${{ github.event.inputs.instance_number || '1' }}"
+        $id = $env:ANYDESK_ID
+        
+        $msgText = "💻 <b>MÁQUINA ANYDESK PRONTA!</b>`n" +
+                   "━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n" +
+                   "🏷️ <b>Instância:</b> <code>#$instanceNum</code>`n" +
+                   "🆔 <b>AnyDesk ID:</b> <code>$id</code>`n" +
+                   "🔑 <b>Senha:</b> <code>P@ssw0rd!</code>`n" +
+                   "⏱️ <b>Duração:</b> <code>Até 6 horas</code>`n" +
+                   "━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n" +
+                   "📌 <i>Abra o AnyDesk, insira o ID acima e aceda com a senha fornecida.</i>"
+
+        $payload = @{
+            chat_id = $chatId
+            text = $msgText
+            parse_mode = "HTML"
+        } | ConvertTo-Json -Compress
+
+        [System.Text.Encoding]::UTF8.GetBytes($payload) | Out-Null
+        Invoke-RestMethod -Uri "https://api.telegram.org/bot$botToken/sendMessage" -Method Post -ContentType "application/json; charset=utf-8" -Body $payload
+
+    - name: Keep Session Alive
+      run: |
+        Write-Host "`n=== SESSÃO ANYDESK ATIVA ===" -ForegroundColor Green
+        Write-Host "Instância AnyDesk rodando com sucesso!" -ForegroundColor Cyan
+        
+        $counter = 0
+        while ($true) {
+          $counter++
+          Write-Host "Sessão ativa - Check #$counter ($(Get-Date))" -ForegroundColor Green
+          Start-Sleep -Seconds 60
+        }
