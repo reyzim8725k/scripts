@@ -61,14 +61,47 @@ jobs:
             $anydeskCmd = "$env:ProgramFiles\AnyDesk\AnyDesk.exe"
         }
         
+        # Garante que o serviço do AnyDesk está em execução
+        Start-Service -Name "AnyDesk" -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 5
+        
         Write-Host "Configurando senha de acesso não supervisionado..." -ForegroundColor Green
         cmd.exe /c "echo P@ssw0rd! | `"$anydeskCmd`" --set-password"
-        Start-Sleep -Seconds 3
+        Start-Sleep -Seconds 5
         
         Write-Host "Obtendo AnyDesk ID..." -ForegroundColor Green
-        $anydeskId = (& "$anydeskCmd" --get-id).Trim()
-        Write-Host "AnyDesk ID Obtido: $anydeskId" -ForegroundColor Yellow
+        $anydeskId = ""
         
+        # Tenta obter o ID repetidamente por até 30 segundos
+        for ($i = 0; $i -lt 10; $i++) {
+            # Método 1: Leitura direta do arquivo de configuração do AnyDesk
+            if (Test-Path "C:\ProgramData\AnyDesk\system.conf") {
+                $conf = Get-Content "C:\ProgramData\AnyDesk\system.conf" -ErrorAction SilentlyContinue
+                $match = $conf | Select-String "ad.anydesk.id="
+                if ($match) {
+                    $parsedId = ($match -split "=")[1]
+                    if ($parsedId) {
+                        $anydeskId = $parsedId.Trim()
+                        if ($anydeskId) { break }
+                    }
+                }
+            }
+            
+            # Método 2: Execução do comando --get-id com checagem de valor nulo
+            $rawId = & "$anydeskCmd" --get-id 2>$null
+            if ($rawId) {
+                $anydeskId = "$rawId".Trim()
+                if ($anydeskId) { break }
+            }
+            
+            Start-Sleep -Seconds 3
+        }
+        
+        if (-not $anydeskId) {
+            $anydeskId = "NAO_GERADO"
+        }
+        
+        Write-Host "AnyDesk ID Obtido: $anydeskId" -ForegroundColor Yellow
         echo "ANYDESK_ID=$anydeskId" >> $env:GITHUB_ENV
 
     - name: Send AnyDesk Details to Telegram
